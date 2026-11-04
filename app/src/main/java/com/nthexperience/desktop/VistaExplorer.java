@@ -208,22 +208,23 @@ final class VistaExplorer extends VistaShell {
     private void replaceBookmark(Uri before,Uri after){JSONArray values=LinkedFiles.list(store);for(int i=0;i<values.length();i++){JSONObject item=values.optJSONObject(i);if(item!=null&&sameBookmark(item.optString("uri"),before))try{values.put(i,LinkedFiles.describe(getContext(),after));}catch(Exception ignored){}}store.prefs.edit().putString("linked_files",values.toString()).apply();}
     private void removeBookmark(Uri uri){JSONArray values=LinkedFiles.list(store);for(int i=values.length()-1;i>=0;i--)if(values.optJSONObject(i)!=null&&sameBookmark(values.optJSONObject(i).optString("uri"),uri))values.remove(i);store.prefs.edit().putString("linked_files",values.toString()).apply();}
     private boolean sameBookmark(String value,Uri uri){try{return DocumentOps.same(Uri.parse(value),uri);}catch(RuntimeException ex){return value.equals(uri.toString());}}
-    private void background(View anchor,float x,float y){DesktopContextMenu menu=menu("Folder context menu");menu.submenu("View","appearance",this::views);menu.submenu("Sort by","programs",()->sortMenu(anchor));menu.submenu("Group by","programs",()->groupMenu(anchor));menu.item("Refresh","refresh",this::refreshFiles);menu.separator();menu.item("Paste","paste",!busy&&canCreate()&&!ExplorerClipboard.files.isEmpty(),this::paste);menu.item("Undo Copy","empty",!busy&&undoCopy!=null,this::undoCopy);menu.separator();menu.item("New folder","files",!busy&&canCreate(),this::newFolder);menu.submenu("New","files",()->newMenu(anchor));if(page().startsWith("folder:")){menu.item("Select all","checklist",listing!=null&&!listing.items.isEmpty(),this::selectAll);menu.item("Clear selection","checklist",selectionMode||!selected.isEmpty(),this::clearSelection);menu.item("Customize This Folder…","appearance",this::customize);menu.item("Properties","control",this::folderProperties);if(!canCreate()&&(!StorageAccess.ours(parent())||!StorageAccess.has(getContext())))menu.item("Enable changes for this folder…","security",()->requestChanges(parent()));}else menu.item("Add a folder…","files",files::chooseFolder);show(menu,anchor,x,y);}
-    private void organize(){
-        DesktopContextMenu menu=menu("Organize");
-        menu.submenu("Layout","appearance",()->{
-            DesktopContextMenu layout=menu("Explorer layout");
-            layout.checked("Menu bar",menuBar.getVisibility()==VISIBLE,()->{
-                boolean show=menuBar.getVisibility()!=VISIBLE;
-                menuBar.setVisibility(show?VISIBLE:GONE);
-                store.prefs.edit().putBoolean("explorer_menu_bar",show).apply();
-            });
-            layout.checked("Navigation pane",navigationPaneVisible(),this::toggleNavigationPane);
-            ContextMenus.centered(commands,(x,y)->show(layout,commands,x,y));
+    private void background(View anchor,float x,float y){folderMenu(anchor,x,y,false);}
+    private void organize(){ContextMenus.centered(commands,(x,y)->folderMenu(commands,x,y,true));}
+    private void folderMenu(View anchor,float x,float y,boolean organize){DesktopContextMenu menu=menu("Folder context menu");
+        if(organize)menu.submenu("Layout","appearance",this::layoutMenu);
+        menu.submenu("View","appearance",this::views);menu.submenu("Sort by","programs",()->sortMenu(anchor));menu.submenu("Group by","programs",()->groupMenu(anchor));menu.item("Refresh","refresh",this::refreshFiles);menu.separator();menu.item("Paste","paste",!busy&&canCreate()&&!ExplorerClipboard.files.isEmpty(),this::paste);menu.item("Undo Copy","empty",!busy&&undoCopy!=null,this::undoCopy);menu.separator();menu.item("New folder","files",!busy&&canCreate(),this::newFolder);menu.submenu("New","files",()->newMenu(anchor));if(page().startsWith("folder:")){menu.item("Select all","checklist",listing!=null&&!listing.items.isEmpty(),this::selectAll);menu.item("Clear selection","checklist",selectionMode||!selected.isEmpty(),this::clearSelection);menu.item("Customize This Folder…","appearance",this::customize);menu.item("Properties","control",this::folderProperties);if(!canCreate()&&(!StorageAccess.ours(parent())||!StorageAccess.has(getContext())))menu.item("Enable changes for this folder…","security",()->requestChanges(parent()));}else menu.item("Add a folder…","files",files::chooseFolder);
+        if(organize)menu.item("Folder and search options…","control",this::folderOptions);
+        show(menu,anchor,x,y);
+    }
+    private void layoutMenu(){
+        DesktopContextMenu layout=menu("Explorer layout");
+        layout.checked("Menu bar",menuBar.getVisibility()==VISIBLE,()->{
+            boolean show=menuBar.getVisibility()!=VISIBLE;
+            menuBar.setVisibility(show?VISIBLE:GONE);
+            store.prefs.edit().putBoolean("explorer_menu_bar",show).apply();
         });
-        menu.submenu("Folder commands","files",()->ContextMenus.centered(commands,(x,y)->background(commands,x,y)));
-        menu.item("Folder and search options…","control",this::folderOptions);
-        ContextMenus.centered(commands,(x,y)->show(menu,commands,x,y));
+        layout.checked("Navigation pane",navigationPaneVisible(),this::toggleNavigationPane);
+        ContextMenus.centered(commands,(x,y)->show(layout,commands,x,y));
     }
     private void views(){DesktopContextMenu menu=menu("View options");for(String label:new String[]{"Large icons","Medium icons","Small icons","List","Details","Tiles"})menu.checked(label,viewMode.equals(label),()->setView(label));menu.separator();menu.checked("Navigation pane",navigationPaneVisible(),this::toggleNavigationPane);ContextMenus.centered(commands,(x,y)->show(menu,commands,x,y));}
     private void setView(String label){viewMode=label;details=label.equals("Details");store.prefs.edit().putString("explorer_view_mode",label).putBoolean("explorer_details",details).apply();saveFolderStyle();render();}

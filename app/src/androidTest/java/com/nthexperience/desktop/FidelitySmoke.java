@@ -205,8 +205,10 @@ public final class FidelitySmoke extends Instrumentation {
         check(organizer.page().equals("desktop"),"Back returns to the original folder view");
         tap(find(organizer,v->navigation.equals(v.getContentDescription())),700);
         menuTap("Open in new window");
-        DesktopWindow separate=(DesktopWindow)find(v->v instanceof DesktopWindow&&((DesktopWindow)v).toolId.startsWith("@organizer:"));
-        check(separate!=null&&((DesktopOrganizer)separate.body).page().equals("contents:"+recycleFixture)
+        Predicate<View> separateOrganizer=v->v instanceof DesktopWindow&&((DesktopWindow)v).toolId.startsWith("@organizer:");
+        await(()->find(separateOrganizer)!=null,"The organizer opens its independent window");
+        DesktopWindow separate=(DesktopWindow)find(separateOrganizer);
+        check(((DesktopOrganizer)separate.body).page().equals("contents:"+recycleFixture)
                 &&organizer.page().equals("desktop"),"Explicit open creates an independent window");
         close(separate.toolId);
         tap(find(organizer,v->navigation.equals(v.getContentDescription())),700);
