@@ -7,8 +7,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
-import android.graphics.Color;
+import android.graphics.Canvas;
 import android.graphics.Rect;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.view.InputDevice;
@@ -19,6 +20,8 @@ import android.widget.TextView;
 import java.io.FileOutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.lang.reflect.Field;
+import java.util.Objects;
 import java.util.function.Predicate;
 
 /** Real title-bar input on both orientations, including snap previews and canceled drags. */
@@ -27,6 +30,8 @@ public final class SnapSmoke extends Instrumentation {
     private View root;
     private View workspace;
     private long down;
+    private boolean pointerDown;
+    private int pointerX, pointerY;
 
     @Override public void onCreate(Bundle arguments) {
         super.onCreate(arguments);
@@ -68,32 +73,35 @@ public final class SnapSmoke extends Instrumentation {
             settle();
             Rect floating = bounds(left);
             int edgeY = work.centerY();
+            Rect leftHalf = new Rect(0, work.top, work.right / 2, work.bottom);
             begin(left);
             input(MotionEvent.ACTION_MOVE, dp(4), edgeY);
             settle();
             check(bounds(left).left == 0 && home.hasWindowFocus(),
                     "The caption drag moves the window to the edge with the desktop focused");
-            checkOutline(dp(1), work.bottom - dp(18), true, "Left outline appears at the workspace edge");
+            checkPreview(left, leftHalf, "Left outline fills only its usable half");
             saveScreenshot("aero-snap-left-preview");
-            checkOutline(work.right + dp(4), work.bottom - dp(18), false, "Outline clears the Sidebar");
             input(MotionEvent.ACTION_MOVE, work.centerX(), edgeY);
-            checkOutline(dp(1), work.bottom - dp(18), false, "Leaving the edge clears the outline");
+            checkPreview(left, null, "Leaving the edge clears the outline");
             input(MotionEvent.ACTION_MOVE, dp(4), edgeY);
             input(MotionEvent.ACTION_CANCEL, dp(4), edgeY);
             settle();
             check(floating.equals(bounds(left)), "Cancel restores the original floating bounds");
-            checkOutline(dp(1), work.bottom - dp(18), false, "Cancel removes the outline");
+            checkPreview(left, null, "Cancel removes the outline");
 
             drag(left, dp(4), edgeY);
-            Rect leftHalf = new Rect(0, work.top, work.right / 2, work.bottom);
             check(leftHalf.equals(bounds(left)), "Left window fills the exact left half");
             runOnMainSync(() -> home.open("@files"));
             settle();
             DesktopWindow right = window("@files");
             runOnMainSync(() -> right.arrange(dp(28), dp(62), dp(300), dp(230)));
             settle();
-            drag(right, work.right - dp(4), edgeY);
             Rect rightHalf = new Rect(leftHalf.right, work.top, work.right, work.bottom);
+            begin(right);
+            input(MotionEvent.ACTION_MOVE, work.right - dp(4), edgeY);
+            checkPreview(right, rightHalf, "Right outline leaves the always-on-top Sidebar clear");
+            input(MotionEvent.ACTION_UP, work.right - dp(4), edgeY);
+            settle();
             check(rightHalf.equals(bounds(right)), "Right window fills the exact right half");
             tap(title(left));
             check(left.active() && right.isShown() && rightHalf.equals(bounds(right)),
@@ -114,9 +122,8 @@ public final class SnapSmoke extends Instrumentation {
             Rect moved = bounds(left);
             begin(left);
             input(MotionEvent.ACTION_MOVE, work.centerX(), work.top + dp(4));
-            checkOutline(work.centerX(), work.bottom - dp(1), true, "Top outline reaches the end of the workspace");
+            checkPreview(left, work, "Top outline ends above the taskbar");
             saveScreenshot("aero-snap-top-preview");
-            checkOutline(work.centerX(), work.bottom + dp(4), false, "Top outline stays clear of the taskbar");
             input(MotionEvent.ACTION_UP, work.centerX(), work.top + dp(4));
             settle();
             check(left.maximized() && work.equals(bounds(left)), "Top release maximizes within the work area");
@@ -159,6 +166,14 @@ public final class SnapSmoke extends Instrumentation {
             StringWriter trace = new StringWriter();
             failure.printStackTrace(new PrintWriter(trace));
             result.putString("stream", "FAIL: " + trace);
+        }
+        if (pointerDown) {
+            try {
+                input(MotionEvent.ACTION_CANCEL, pointerX, pointerY);
+            } catch (RuntimeException | AssertionError cleanup) {
+                result.putString("stream", result.getString("stream") + "Could not cancel input: " + cleanup + "\n");
+                status = Activity.RESULT_CANCELED;
+            }
         }
         finish(status, result);
     }
@@ -224,32 +239,31 @@ public final class SnapSmoke extends Instrumentation {
         try {
             event.setSource(InputDevice.SOURCE_TOUCHSCREEN);
             check(getUiAutomation().injectInputEvent(event, true), "Touch event " + action + " was injected");
+            pointerX = x;
+            pointerY = y;
+            pointerDown = action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_MOVE;
         } finally {
             event.recycle();
         }
     }
 
-    private void checkOutline(int x, int y, boolean expected, String message) throws Exception {
+    private void checkPreview(DesktopWindow window, Rect expected, String message) throws Exception {
         settle();
-        int[] origin = new int[2];
-        workspace.getLocationOnScreen(origin);
-        Bitmap screenshot = getUiAutomation().takeScreenshot();
-        check(screenshot != null, "Screenshot is available");
-        try {
-            int color = screenshot.getPixel(origin[0] + x, origin[1] + y);
-            boolean matches = Math.abs(Color.red(color) - 182) < 6
-                    && Math.abs(Color.green(color) - 232) < 6 && Color.blue(color) > 249;
-            check(matches == expected, message + " (pixel #" + Integer.toHexString(color) + ")");
-        } finally {
-            screenshot.recycle();
-        }
+        Field field = DesktopWindow.class.getDeclaredField("snapOutline");
+        field.setAccessible(true);
+        Drawable outline = (Drawable) field.get(window);
+        Rect actual = outline.getCallback() == null ? null : new Rect(outline.getBounds());
+        check(Objects.equals(expected, actual), message + " (expected " + expected + ", got " + actual + ")");
     }
 
     private void saveScreenshot(String name) throws Exception {
-        Bitmap image = getUiAutomation().takeScreenshot();
-        if (image == null) return;
-        try (FileOutputStream out = getTargetContext().openFileOutput(name + ".png", Context.MODE_PRIVATE)) {
-            image.compress(Bitmap.CompressFormat.PNG, 100, out);
+        if (root == null || root.getWidth() < 1 || root.getHeight() < 1) return;
+        Bitmap image = Bitmap.createBitmap(root.getWidth(), root.getHeight(), Bitmap.Config.ARGB_8888);
+        try {
+            runOnMainSync(() -> root.draw(new Canvas(image)));
+            try (FileOutputStream out = getTargetContext().openFileOutput(name + ".png", Context.MODE_PRIVATE)) {
+                image.compress(Bitmap.CompressFormat.PNG, 100, out);
+            }
         } finally {
             image.recycle();
         }
