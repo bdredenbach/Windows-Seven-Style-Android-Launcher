@@ -31,7 +31,13 @@ public final class DesktopExtrasSmoke extends Instrumentation {
         finish(success?Activity.RESULT_OK:Activity.RESULT_CANCELED,result);
     }
     private void previews()throws Exception{
-        progress("native window overview and pointer preview");ui(()->home.open("@notes"));DesktopWindow notes=window("@notes");EditText edit=(EditText)find(notes,v->"Notepad text".equals(v.getContentDescription()));ui(()->edit.setText("Extras keeps this note"));ui(()->home.open("@calendar"));DesktopWindow calendar=window("@calendar");ui(calendar::minimize);
+        progress("Flip 3D starts with a desktop card even when no windows are open");
+        ui(()->home.open("@flip3d"));awaitNode("Flip to Show Desktop");nodeTap("Close Flip 3D");
+        ui(()->home.open("@notes"));DesktopWindow notes=window("@notes");
+        ui(()->home.open("@flip3d"));awaitNode("Flip to Notepad");awaitNode("Flip to Show Desktop");
+        nodeTap("Next window");awaitNode("Selected window: Show Desktop");
+        nodeTap("Previous window");awaitNode("Selected window: Notepad");nodeTap("Switch to window");
+        progress("native window overview and pointer preview");EditText edit=(EditText)find(notes,v->"Notepad text".equals(v.getContentDescription()));ui(()->edit.setText("Extras keeps this note"));ui(()->home.open("@calendar"));DesktopWindow calendar=window("@calendar");ui(calendar::minimize);
         View arrow = find(root, v -> "Device controls".equals(v.getContentDescription()));
         tap(arrow, 60);
         View taskManager = find(root, v -> "Task Manager".equals(v.getContentDescription()));

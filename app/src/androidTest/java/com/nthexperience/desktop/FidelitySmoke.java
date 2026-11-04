@@ -161,6 +161,12 @@ public final class FidelitySmoke extends Instrumentation {
     }
     private void backgrounds()throws Exception{
         progress("background preview, save, custom picture and position");int saved=store.prefs.getInt("wallpaper",0);ui(()->home.open("setting:page:background"));VistaControlPanel control=(VistaControlPanel)window("@control").body;int choice=saved==1?2:1;tap(find(control,v->("Preview background: "+(choice==1?"Twilight":"Meadow")).equals(v.getContentDescription())),60);check(store.prefs.getInt("wallpaper",0)==saved,"Thumbnail only previews");tap(text(control,"Save changes"),60);check(store.prefs.getInt("wallpaper",0)==choice,"Save applies");shot("vista-background-picker.png");
+        tap(find(control,v->"Include background: Harmony".equals(v.getContentDescription())),60);
+        tap(find(control,v->"Shuffle".equals(v.getContentDescription())),60);
+        tap(text(control,"Save changes"),60);
+        check(DesktopBackgrounds.current(store.prefs).size()==2,"Two checked pictures form a slideshow");
+        DesktopBackup.Plan slideshow=DesktopBackup.parse(DesktopBackup.snapshot(store).toString());
+        check(Boolean.TRUE.equals(slideshow.values.get(DesktopBackgrounds.SHUFFLE)),"Slideshow settings survive backup validation");
         folder=new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS),"Nth-Fidelity-"+SystemClock.uptimeMillis());check(folder.mkdirs(),"Isolated fixture directory");File picture=new File(folder,"Background.png");Bitmap image=Bitmap.createBitmap(160,80,Bitmap.Config.ARGB_8888);image.eraseColor(0xffc64e46);try(FileOutputStream out=new FileOutputStream(picture)){image.compress(Bitmap.CompressFormat.PNG,100,out);}image.recycle();String uri=StorageAccess.document("Documents/"+folder.getName()+"/Background.png").toString();ui(()->control.wallpaperChosen(uri));await(()->{View save=text(control,"Save changes");return save!=null&&save.isEnabled();},"Actual selected image decodes");tap(find(control,v->"Picture position".equals(v.getContentDescription())),60);menuTap("Fit");
         await(()->{View current=find(control,v->"Picture position".equals(v.getContentDescription()));return current instanceof Spinner&&"Fit".equals(((Spinner)current).getSelectedItem());},"Native picture position selection settles");
         for(int attempt=0;attempt<3&&!uri.equals(store.prefs.getString("wallpaper_photo",""));attempt++)tap(text(control,"Save changes"),60);

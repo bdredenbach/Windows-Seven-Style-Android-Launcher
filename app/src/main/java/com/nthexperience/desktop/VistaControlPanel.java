@@ -35,7 +35,7 @@ final class VistaControlPanel extends VistaShell {
             case "personalization":personalization(column);break;
             case "background":backgrounds(column);break;
             case "colors":colors(column);break;
-            case "grouping":heading(column,"Group similar taskbar buttons","Each folder window keeps its own navigation and view state.");for(String mode:new String[]{"Never","When full","Always"}){RadioButton option=new RadioButton(getContext());option.setText(mode);option.setChecked(store.prefs.getString("taskbar_grouping",store.prefs.getBoolean("taskbar_show_labels",false)?"When full":"Always").equals(mode));option.setContentDescription("Taskbar grouping: "+mode);option.setOnClickListener(v->{store.prefs.edit().putString("taskbar_grouping",mode).apply();actions.action("taskbar-refresh");render();});column.addView(option);}break;
+            case "grouping":heading(column,"Group similar taskbar buttons","Each folder window keeps its own navigation and view state.");for(String mode:new String[]{"Never","When full","Always"}){RadioButton option=new RadioButton(getContext());option.setText(mode);option.setChecked(store.prefs.getString("taskbar_grouping","Always").equals(mode));option.setContentDescription("Taskbar grouping: "+mode);option.setOnClickListener(v->{store.prefs.edit().putString("taskbar_grouping",mode).apply();actions.action("taskbar-refresh");render();});column.addView(option);}break;
             case "sounds":heading(column,"Desktop sound effects","Choose the cues you want to hear.");DesktopSounds.settings(getContext(),column);break;
             case "startup":startup(column);break;
             case "taskbar":heading(column,"Taskbar and Start Menu","Choose how your taskbar and Start menu behave.");
@@ -110,8 +110,15 @@ final class VistaControlPanel extends VistaShell {
     private void paneLink(String title,boolean selected,Runnable action){TextView link=Aero.text(getContext(),title,11,0xff165483);link.setPadding(dp(3),dp(7),dp(2),dp(7));if(selected)link.setTypeface(Aero.strong(getContext()));link.setContentDescription(title);link.setFocusable(true);android.graphics.drawable.StateListDrawable states=new android.graphics.drawable.StateListDrawable();for(int state:new int[]{android.R.attr.state_pressed,android.R.attr.state_focused,android.R.attr.state_hovered})states.addState(new int[]{state},Aero.panel(getContext(),0x553b5e86,0x55224662,2,0));states.addState(new int[]{},new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));link.setBackground(states);link.setOnClickListener(v->action.run());side.addView(link,new LayoutParams(-1,-2));}
     private void renderPane(){side.removeAllViews();paneLink("Control Panel Home",page().equals("home")&&!classic,()->selectView(false));if(page().startsWith("category:")){for(String[] category:CATEGORIES)paneLink(category[1],page().equals("category:"+category[0]),()->selectCategory(category[0]));}paneLink("Classic View",page().equals("home")&&classic,()->selectView(true));String[][] related=related();if(related.length>0){side.addView(new View(getContext()),new LayoutParams(1,dp(20),1));paneHeading(page().equals("personalization")?"Tasks and See also":"See also");for(String[] item:related)paneLink(item[0],false,()->destination(item[1]));}}
     private String title(String page){if(page.equals("category:security"))return "System and Security";if(page.startsWith("category:"))for(String[] category:CATEGORIES)if(category[0].equals(page.substring(9)))return category[1];ControlPanelCatalog.Panel owner=ControlPanelCatalog.owner("page:"+page);if(owner!=null){if(owner.destination.equals("page:"+page))return owner.title;for(ControlPanelCatalog.Task task:owner.tasks)if(task.destination.equals("page:"+page))return task.title;}return "Control Panel";}
-    void wallpaperChosen(String uri){GadgetLayout.put(backgroundDraft,"uri",uri);GadgetLayout.put(backgroundDraft,"theme",store.prefs.getInt("wallpaper",AeroWallpaper.SEVEN));GadgetLayout.put(backgroundDraft,"position",store.prefs.getString("wallpaper_position","Fill"));navigate("background");render();}
-    private void backgrounds(LinearLayout column){column.addView(new BackgroundPicker(getContext(),store,backgroundDraft,()->actions.action("wallpaper-browse"),()->{actions.action("wallpaper");if(!backgroundDraft.has("theme"))render();}),new LayoutParams(-1,-2));}
+    void wallpaperChosen(String uri){wallpaperChosen(Collections.singletonList(uri));}
+    void wallpaperChosen(List<String> photos){
+        BackgroundPicker.imported(backgroundDraft,photos);
+        if(page().equals("background"))render();else navigate("background");
+    }
+    private void backgrounds(LinearLayout column){
+        column.addView(new BackgroundPicker(getContext(),store,backgroundDraft,()->actions.action("wallpaper-browse"),
+                ()->actions.action("wallpaper-folder"),()->{actions.action("wallpaper");render();}),new LayoutParams(-1,-2));
+    }
 
     private void colors(LinearLayout column){
         heading(column,"Change your window colors","Color your glass independently of the desktop background.");

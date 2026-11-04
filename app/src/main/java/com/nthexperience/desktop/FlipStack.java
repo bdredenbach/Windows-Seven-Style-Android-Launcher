@@ -42,7 +42,7 @@ final class FlipStack extends FrameLayout {
         this.desktopImage = desktopImage;
         this.dismiss = dismiss;
         int tasks = windows.size() + apps.size();
-        count = tasks == 0 ? 0 : tasks + 1;
+        count = tasks + 1;
         setAccessibilityPaneTitle("Flip 3D");
         setBackgroundColor(0xff102434);
         if (desktopImage != null) {
@@ -82,7 +82,6 @@ final class FlipStack extends FrameLayout {
         previous.setEnabled(count > 1);
         buttons.addView(previous, new LinearLayout.LayoutParams(dp(46), dp(46)));
         TextView open = control("Switch to window", "Switch to window", this::activate);
-        open.setEnabled(count > 0);
         buttons.addView(open, new LinearLayout.LayoutParams(0, dp(46), 1));
         TextView next = control("›", "Next window", () -> step(1));
         next.setEnabled(count > 1);
@@ -118,8 +117,8 @@ final class FlipStack extends FrameLayout {
         return index < windows.size() ? windows.get(index).caption() : host.label(apps.get(index - windows.size()));
     }
     private void updateStatus() {
-        status.setContentDescription(count == 0 ? null : "Selected window: " + title(selected));
-        status.setText(count == 0 ? "No open windows" : title(selected) + "  •  " + (selected + 1) + " of " + count);
+        status.setContentDescription("Selected window: " + title(selected));
+        status.setText(title(selected) + "  •  " + (selected + 1) + " of " + count);
     }
     void step(int direction) {
         if (count < 2) return;
@@ -131,7 +130,6 @@ final class FlipStack extends FrameLayout {
         open(selected);
     }
     private void open(int index) {
-        if (count == 0) return;
         dismiss.run();
         if (desktop(index)) host.showDesktop();
         else if (index < windows.size()) {
@@ -171,7 +169,7 @@ final class FlipStack extends FrameLayout {
     private void positionCards(float offset) {
         progress = offset;
         int width = stage.getWidth(), height = stage.getHeight();
-        if (count == 0 || width == 0 || height == 0) return;
+        if (width == 0 || height == 0) return;
         int first = offset < 0 ? -1 : 0;
         int last = first + Math.min(REAR_CARDS + (offset > 0 ? 1 : 0) - first, count - 1);
         for (int slot = last; slot >= first; slot--) {
@@ -185,7 +183,7 @@ final class FlipStack extends FrameLayout {
             float distance = Math.max(0, depth);
             float scale = (float) Math.pow(.85, distance) + Math.max(0, -depth) * .12f;
             float shift = Math.min(4.8f, depth);
-            card.setTranslationX(width * (.14f - .115f * shift));
+            card.setTranslationX(width * ((count == 1 ? 0 : .14f) - .115f * shift));
             card.setTranslationY(height * (.10f - .075f * shift));
             card.setTranslationZ(dp(12) - dp(2) * depth);
             card.setScaleX(scale);

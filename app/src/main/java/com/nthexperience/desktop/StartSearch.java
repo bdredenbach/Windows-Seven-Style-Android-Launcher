@@ -18,6 +18,7 @@ final class StartSearch {
         if("photo gallery pictures images".contains(q))result.add(new Result("@photos","Photo Gallery","Programs","pictures",null,true));
         if("nth media player music audio mp3 video".contains(q))result.add(new Result(MediaLibrary.PLAYER,MediaLibrary.PLAYER_TITLE,"Programs","musicfile",null,true));
         if("nth media center music video".contains(q))result.add(new Result(MediaLibrary.CENTER,MediaLibrary.CENTER_TITLE,"Programs","videofile",null,true));
+        if("flip 3d aero window switcher".contains(q))result.add(new Result("@flip3d","Flip 3D","Programs","appearance",null,false));
         VistaControlPanel.searchItems(q,result);
         for(String[] gadget:GadgetCatalog.ITEMS)if(GadgetCatalog.extra(gadget[0])&&(gadget[1]+" "+gadget[3]).toLowerCase(Locale.ROOT).contains(q))result.add(new Result("@gadget:"+gadget[0],gadget[1],"Gadgets",GadgetCatalog.icon(gadget[0]),null,false));
         for(String[] note:new String[][]{{"note","Notepad","@notes"},{"gadget_note","Sticky note","@sticky"}}){String text=store.prefs.getString(note[0],"");if((note[1]+" "+text).toLowerCase(Locale.ROOT).contains(q))result.add(new Result(note[2],note[1],"Notes","notes",null,false));}

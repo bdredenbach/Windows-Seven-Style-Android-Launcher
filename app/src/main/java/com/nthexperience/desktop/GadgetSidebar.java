@@ -85,6 +85,10 @@ final class GadgetSidebar extends FrameLayout {
         }
         arrange();refreshReadings();updateActivity();
     }
+    void alignAdded(String id){
+        if(!locked())layout.dock(id);
+        rebuild();reveal();
+    }
     void raise(){bringToFront();}
     void visible(boolean value){layout.visible(value);visibilityFromStore();actions.sidebarChanged();}
     void orientation(String key){
@@ -117,19 +121,24 @@ final class GadgetSidebar extends FrameLayout {
             else applyBounds(id,layout.scale(id),layout.x(id),layout.y(id));
         }
         if(automatic.isEmpty())return;
-        int count=automatic.size();
-        boolean compact=count>Math.max(1,hostWidth/dp(156))*Math.max(1,hostHeight/dp(156));
-        float scale=compact?.68f:1;
-        int cellWidth=dp(compact?116:161),cellHeight=dp(compact?113:163);
-        int rows=Math.min(count,Math.max(1,hostHeight/cellHeight));
-        int columns=(count+rows-1)/rows;
-        int columnGap=Math.min(cellWidth,Math.max(0,(hostWidth-cellWidth)/Math.max(1,columns-1)));
-        for(int index=0;index<count;index++){
-            String id=automatic.get(index);
+        int gap=dp(7), margin=dp(4);
+        int total=0;
+        for(String id:automatic)total+=dp(GadgetView.height(id));
+        float scale=Math.max(.68f,Math.min(1,(hostHeight-2f*margin-gap*(automatic.size()-1))/Math.max(1,total)));
+        int right=hostWidth-margin,y=margin,columns=1,used=margin;
+        int cardWidth=Math.round(dp(132)*scale)+dp(24);
+        for(String id:automatic){
+            int height=Math.round(dp(GadgetView.height(id))*scale);
+            if(used>margin&&used+height>hostHeight-margin){columns++;used=margin;}
+            used+=height+gap;
+        }
+        int columnWidth=Math.min(cardWidth+gap,Math.max(1,(hostWidth-cardWidth-2*margin)/Math.max(1,columns-1)));
+        for(String id:automatic){
             int[] bounds=DesktopGeometry.gadget(hostWidth,hostHeight,dp(132),dp(GadgetView.height(id)),dp(24),scale,0,0);
-            int x=hostWidth-bounds[2]-dp(4)-index/rows*columnGap;
-            int y=dp(4)+index%rows*cellHeight;
+            if(y>margin&&y+bounds[3]>hostHeight-margin){right-=columnWidth;y=margin;}
+            int x=Math.max(0,right-bounds[2]);
             applyBounds(id,scale,DesktopGeometry.fraction(x,hostWidth-bounds[2]),DesktopGeometry.fraction(y,hostHeight-bounds[3]));
+            y+=bounds[3]+gap;
         }
     }
     private void applyBounds(String id,float scale,float x,float y){

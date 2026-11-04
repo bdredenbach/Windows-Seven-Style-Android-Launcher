@@ -13,6 +13,11 @@ final class SevenThemes extends GridLayout {
             new Theme("Seven Blue",AeroWallpaper.SEVEN,0,true),
             new Theme("Twilight",1,4,true),
             new Theme("Meadow",2,3,true),
+            new Theme("Harmony",4,0,true),
+            new Theme("Landscapes",5,0,true,6,7),
+            new Theme("Architecture",8,7,true),
+            new Theme("Midnight Circuit",9,2,true),
+            new Theme("Paper Skies",10,5,true),
             new Theme("Seven Basic",AeroWallpaper.SEVEN,0,false)
     };
 
@@ -55,21 +60,24 @@ final class SevenThemes extends GridLayout {
         final String name;
         final int wallpaper,color;
         final boolean glass;
+        final java.util.List<String> backgrounds=new java.util.ArrayList<>();
 
-        Theme(String name,int wallpaper,int color,boolean glass){
+        Theme(String name,int wallpaper,int color,boolean glass,int... more){
             this.name=name;this.wallpaper=wallpaper;this.color=color;this.glass=glass;
+            backgrounds.add(DesktopBackgrounds.stock(wallpaper));
+            for(int id:more)backgrounds.add(DesktopBackgrounds.stock(id));
         }
 
         boolean matches(DesktopStore store){
-            return store.prefs.getString("wallpaper_photo","").isEmpty()
-                    &&store.prefs.getInt("wallpaper",AeroWallpaper.SEVEN)==wallpaper
+            return DesktopBackgrounds.current(store.prefs).equals(backgrounds)
                     &&store.prefs.getInt("aero_color",0)==color
                     &&store.prefs.getBoolean("aero_transparency",true)==glass;
         }
 
         void apply(DesktopStore store){
-            store.prefs.edit().putInt("wallpaper",wallpaper).remove("wallpaper_photo")
-                    .putInt("aero_color",color).putBoolean("aero_transparency",glass).apply();
+            android.content.SharedPreferences.Editor edit=store.prefs.edit();
+            DesktopBackgrounds.choose(edit,backgrounds,wallpaper);
+            edit.putInt("aero_color",color).putBoolean("aero_transparency",glass).apply();
         }
     }
 }

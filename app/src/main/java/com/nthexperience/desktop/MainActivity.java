@@ -50,7 +50,7 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
     private MediaPlayback playback;
     private MediaLibrary mediaLibrary;
     private MediaPanel mediaCenter;
-    private static final int PICK_MEDIA = 306;
+    private static final int PICK_MEDIA = 306, PICK_WALLPAPERS = 305, PICK_WALLPAPER_FOLDER = 307;
     private int previousShellAccessibility;
     private DesktopIconGrid desktop;
     private ScrollView desktopScroll;
@@ -73,7 +73,9 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
     private final Runnable clockTick=new Runnable(){public void run(){updateClock();main.postDelayed(this,60000-System.currentTimeMillis()%60000);}};
 
     @Override public void onCreate(Bundle saved){
-        super.onCreate(saved);store=new DesktopStore(this);storageSetup=new StorageSetup(this);storageAllowed=StorageAccess.has(this);restoreStorageSetup=saved!=null&&saved.getBoolean("storage_setup_open");layoutKey=getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE?"landscape":"portrait";
+        super.onCreate(saved);store=new DesktopStore(this);
+        if(!store.prefs.getBoolean("seven_taskbar_grouping_set",false))store.prefs.edit().putString("taskbar_grouping","Always").putBoolean("seven_taskbar_grouping_set",true).apply();
+        storageSetup=new StorageSetup(this);storageAllowed=StorageAccess.has(this);restoreStorageSetup=saved!=null&&saved.getBoolean("storage_setup_open");layoutKey=getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE?"landscape":"portrait";
         if(saved!=null){
             pendingFolderWindow=saved.getString("folder_window","@files");
             homeRequestInFlight=saved.getBoolean("home_request_in_flight");
@@ -83,7 +85,7 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
         if(Build.VERSION.SDK_INT>=28){WindowManager.LayoutParams attributes=getWindow().getAttributes();attributes.layoutInDisplayCutoutMode=Build.VERSION.SDK_INT>=30?WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS:WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;getWindow().setAttributes(attributes);}
         if(Build.VERSION.SDK_INT>=30)getWindow().setDecorFitsSystemWindows(false);
         else getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
-        brightness=new BrightnessControl(this);brightness.apply();previews=new WindowPreviews(this,new WindowPreviews.Host(){public List<DesktopWindow> windows(){return orderedWindows();}public List<String> external(){List<String> ids=new ArrayList<>();for(String id:ExternalTasks.list())if(entries.containsKey(id))ids.add(id);return ids;}public String label(String id){return MainActivity.this.label(id);}public void open(String id){MainActivity.this.open(id);}public View wallpaper(){return wallpaper;}public void showDesktop(){if(desktopHidden.isEmpty())MainActivity.this.showDesktop();}});
+        brightness=new BrightnessControl(this);brightness.apply();previews=new WindowPreviews(this,new WindowPreviews.Host(){public List<DesktopWindow> windows(){return orderedWindows();}public List<String> external(){List<String> ids=new ArrayList<>();for(String id:ExternalTasks.list())if(entries.containsKey(id))ids.add(id);return ids;}public String label(String id){return MainActivity.this.label(id);}public void open(String id){MainActivity.this.open(id);}public void preparePreview(){startMenu.hide();if(tray!=null)tray.dismiss();}public View wallpaper(){return wallpaper;}public void showDesktop(){if(desktopHidden.isEmpty())MainActivity.this.showDesktop();}});
         buildDesktop();weatherLocation=new WeatherLocation(this,store,sidebar.weather,()->store.gadgets().contains("weather"),this::updateWeatherSummary);applySystemChrome();String backupStatus=getIntent().getStringExtra("backup_status");if(backupStatus!=null){getIntent().removeExtra("backup_status");main.post(()->toast(backupStatus));}
         handleRequestedTool();
         if(saved!=null&&saved.containsKey("desktop_session")){
@@ -208,7 +210,7 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
         Set<String> explorerIds=new HashSet<>();
         for(Map.Entry<String,DesktopWindow> item:windows.entrySet())if(item.getValue().getParent()!=null){
             taskIds.add(item.getKey());
-            if(item.getValue().body instanceof VistaExplorer)explorerIds.add(item.getKey());
+            if(folderTask(item.getKey(),item.getValue()))explorerIds.add(item.getKey());
         }
         List<String> external=new ArrayList<>();
         if(store.prefs.getBoolean("taskbar_apps",true)){
@@ -225,28 +227,60 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
         int firstTask=taskItems.getChildCount();
         int occupied=external.size();
         for(String pin:pins)if(!taskIds.contains(pin)&&!external.contains(pin))occupied++;
-        for(List<String> group:TaskbarGrouping.groups(taskIds,explorerIds,store.prefs.getString("taskbar_grouping",showLabels?"When full":"Always"),taskRoom-occupied*(buttonWidth+gap),buttonWidth+gap)){
+        String grouping=store.prefs.getString("taskbar_grouping","Always");
+        List<String> folderPins=new ArrayList<>();
+        for(String pin:pins)if(folderTask(pin,windows.get(pin)))folderPins.add(pin);
+        String folderSlot=folderPins.contains("@files")?"@files":folderPins.isEmpty()?null:folderPins.get(0);
+        boolean familyInPinnedSlot=false;
+        boolean mousePreviews=store.prefs.getBoolean("taskbar_previews",true);
+        for(List<String> group:TaskbarGrouping.groups(taskIds,explorerIds,grouping,taskRoom-occupied*(buttonWidth+gap),buttonWidth+gap)){
             DesktopWindow first=windows.get(group.get(0));boolean grouped=group.size()>1,isActive=false;List<DesktopWindow> members=new ArrayList<>();for(String id:group){DesktopWindow window=windows.get(id);members.add(window);isActive|=window.active();if(window.active())first=window;}DesktopWindow target=first;
             String title=grouped?"Folders ("+group.size()+")":target.caption();LinearLayout button=taskButton(grouped&&!showLabels?"@files":target.toolId,title,showLabels);AeroGlass surface=new AeroGlass(wallpaper,AeroGlass.TASKBUTTON);surface.active(isActive);surface.stacked(grouped&&!showLabels);button.setBackground(surface);button.setSelected(isActive);button.setContentDescription(grouped?"Folder windows, "+group.size()+" windows":(isActive?"Minimize ":"Restore ")+title);
             if(target.toolId.equals("@recycle"))button.setOnDragListener(this::recycleDrop);
-            if(grouped){if(!showLabels)button.setTooltipText(title);button.setOnClickListener(v->{startMenu.hide();tray.dismiss();previews.folders(button,members,true);});ContextMenus.bind(button,(x,y)->{DesktopContextMenu menu=new DesktopContextMenu(this,"Folder group commands");menu.item("Open new Explorer window","files",()->newExplorer("libraries"));menu.separator();for(DesktopWindow window:members)menu.item(window.caption(),"files",window::restore);menu.separator();menu.item("Minimize group","empty",()->{for(DesktopWindow window:members)window.minimize();});menu.item("Close group","close",()->{for(DesktopWindow window:members)window.closeWindow();});ContextMenus.show(menu,button,x,y);});}
-            else{button.setTooltipText(title);if(!explorerIds.contains(target.toolId)&&store.prefs.getBoolean("taskbar_previews",true)){button.setTooltipText(null);previews.bind(button,target);}button.setOnClickListener(v->{startMenu.hide();tray.dismiss();if(target.getVisibility()==View.VISIBLE&&!target.minimizing()&&target.active())target.minimize();else target.restore();});ContextMenus.bind(button,(x,y)->{startMenu.hide();tray.dismiss();target.showSystemMenu(button,x,y);});}
-            if(explorerIds.contains(target.toolId)){
-                button.setTooltipText(null);
-                button.setOnLongClickListener(v->{startMenu.hide();tray.dismiss();previews.folders(button,members,true);return true;});
-                if(store.prefs.getBoolean("taskbar_previews",true))previews.bindFolders(button,members);
-            }
+            boolean pinnedExplorerFamily=folderSlot!=null&&explorerIds.contains(target.toolId)&&explorerIds.size()==group.size();
+            ContextMenus.Open commands=(x,y)->{
+                previews.dismiss();startMenu.hide();tray.dismiss();
+                if(!grouped&&!(pinnedExplorerFamily&&folderPins.size()>1)){target.showSystemMenu(button,x,y);return;}
+                DesktopContextMenu menu=new DesktopContextMenu(this,"Folder group commands");
+                menu.item("Open new Explorer window","files",()->newExplorer("libraries"));
+                for(String pin:folderPins)if(!group.contains(pin))menu.item("Open "+label(pin),"files",()->open(pin));
+                menu.separator();
+                for(DesktopWindow window:members)menu.item(window.caption(),"files",window::restore);
+                menu.separator();
+                menu.item("Minimize group","empty",()->{for(DesktopWindow window:members)window.minimize();});
+                menu.item("Close group","close",()->{for(DesktopWindow window:members)window.closeWindow();});
+                ContextMenus.show(menu,button,x,y);
+            };
+            ContextMenus.bind(button,commands);
+            if(!grouped)button.setOnClickListener(v->{previews.dismiss();startMenu.hide();tray.dismiss();if(target.getVisibility()==View.VISIBLE&&!target.minimizing()&&target.active())target.minimize();else target.restore();});
+            previews.bindTask(button,members,mousePreviews,()->ContextMenus.centered(button,commands));
             LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(showLabels&&grouped?dp(112):buttonWidth,dp(48));
             size.rightMargin=gap;
             button.setLayoutParams(size);
-            boolean pinnedExplorerFamily=!showLabels&&explorerIds.contains(target.toolId)&&explorerIds.size()==group.size()&&pins.contains("@files");
-            String slot=group.contains("@files")||pinnedExplorerFamily?"@files":target.toolId;
+            familyInPinnedSlot|=pinnedExplorerFamily;
+            String slot=pinnedExplorerFamily?folderSlot:target.toolId;
             buttons.put(slot,button);
         }
         for(String id:external){
-           LinearLayout button=taskButton(id,label(id),showLabels);button.setContentDescription("Switch to "+label(id));button.setTooltipText(label(id));AeroGlass appSurface=new AeroGlass(wallpaper,AeroGlass.TASKBUTTON);appSurface.active(false);button.setBackground(appSurface);button.setOnClickListener(v->open(id));ContextMenus.bind(button,(x,y)->{DesktopContextMenu menu=new DesktopContextMenu(this,"Android app taskbar menu");menu.item("Switch to "+label(id),"programs",()->open(id));menu.item("Remove taskbar button","close",()->{ExternalTasks.remove(id);renderTaskbar();});menu.item("Taskbar Properties","control",()->open("setting:page:taskbar"));ContextMenus.show(menu,button,x,y);});LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(buttonWidth,dp(48));lp.rightMargin=gap;button.setLayoutParams(lp);buttons.put(id,button);
+            String title=label(id);
+            LinearLayout button=taskButton(id,title,showLabels);button.setContentDescription("Switch to "+title);
+            AeroGlass surface=new AeroGlass(wallpaper,AeroGlass.TASKBUTTON);surface.active(false);button.setBackground(surface);
+            button.setOnClickListener(v->open(id));
+            ContextMenus.Open commands=(x,y)->{
+                previews.dismiss();
+                DesktopContextMenu menu=new DesktopContextMenu(this,"Android app taskbar menu");
+                menu.item("Switch to "+title,"programs",()->open(id));
+                menu.item("Remove taskbar button","close",()->{ExternalTasks.remove(id);renderTaskbar();});
+                menu.item("Taskbar Properties","control",()->open("setting:page:taskbar"));
+                ContextMenus.show(menu,button,x,y);
+            };
+            ContextMenus.bind(button,commands);
+            previews.bindApp(button,title,true,mousePreviews,()->open(id),()->ContextMenus.centered(button,commands));
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(buttonWidth,dp(48));
+            lp.rightMargin=gap;button.setLayoutParams(lp);buttons.put(id,button);
         }
         for(String id:pins){
+            if(familyInPinnedSlot&&!id.equals(folderSlot)&&folderTask(id,windows.get(id)))continue;
             LinearLayout button=buttons.remove(id);
             if(button==null){
                 button=taskButton(id,label(id),false);
@@ -255,7 +289,9 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
                 button.setBackground(Aero.selection(this));
                 button.setOnClickListener(v->open(id));
                 LinearLayout pinned=button;
-                ContextMenus.bind(pinned,(x,y)->shortcutMenu(pinned,id,"quick",x,y));
+                ContextMenus.Open commands=(x,y)->{previews.dismiss();shortcutMenu(pinned,id,"quick",x,y);};
+                ContextMenus.bind(pinned,commands);
+                previews.bindApp(pinned,label(id),false,false,()->open(id),()->ContextMenus.centered(pinned,commands));
                 LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(buttonWidth,dp(48));
                 size.rightMargin=gap;
                 button.setLayoutParams(size);
@@ -270,6 +306,11 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
         if(sidebar!=null&&store.prefs.getBoolean("sidebar_always_top",false))sidebar.raise();
         desktopHidden.entrySet().removeIf(item->item.getValue().getParent()==null||windows.get(item.getKey())!=item.getValue());if(desktopToggle!=null){String hint=desktopHidden.isEmpty()?"Show desktop":"Restore desktop windows";desktopToggle.setContentDescription(hint);desktopToggle.setTooltipText(hint);}
         DesktopWindow manager=windows.get("@taskmanager");if(manager!=null&&manager.getParent()!=null&&manager.body instanceof TaskManagerPanel)((TaskManagerPanel)manager.body).tasksChanged();
+    }
+    private boolean folderTask(String id,DesktopWindow window){
+        return window!=null&&(window.body instanceof VistaExplorer||window.body instanceof DesktopOrganizer
+                &&(store.isFolder(id)||id.startsWith("@organizer:")))
+                ||FolderLinks.id(id)||store.isFolder(id)||Arrays.asList("@files","@computer","@documents","@pictures","@music","@filemanagers").contains(id);
     }
     private int addQuickLaunch(boolean compact,boolean fit,int viewport,boolean hasTasks){
         if(compact)return 0;
@@ -289,7 +330,9 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
             quick.addView(icon(id,24),new FrameLayout.LayoutParams(dp(24),dp(24),Gravity.CENTER));
             quick.setContentDescription("Open "+label(id));
             quick.setOnClickListener(v->open(id));
-            ContextMenus.bind(quick,(x,y)->shortcutMenu(quick,id,"quick",x,y));
+            ContextMenus.Open commands=(x,y)->{previews.dismiss();shortcutMenu(quick,id,"quick",x,y);};
+            ContextMenus.bind(quick,commands);
+            previews.bindApp(quick,label(id),false,false,()->open(id),()->ContextMenus.centered(quick,commands));
             taskItems.addView(quick,new LinearLayout.LayoutParams(cell,dp(48)));
         }
         if(overflow&&slots>0){
@@ -364,7 +407,7 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
     private String defaultLabel(String id){
         JSONObject location=FolderLinks.get(store,id);if(location!=null)return location.optString("title","Folder");
         if(id.startsWith("@gadget:")&&GadgetCatalog.extra(id.substring(8)))return GadgetCatalog.title(id.substring(8));
-        switch(id){case MediaLibrary.PLAYER:return MediaLibrary.PLAYER_TITLE;case MediaLibrary.CENTER:return MediaLibrary.CENTER_TITLE;case "@recycle":return "Recycle Bin";case "@workspaces":return "Saved Workspaces";case "@recent":return "Recent Items";case "@taskmanager":return "Task Manager";case "@welcome":return "Welcome Center";case "@organize":return "Desktop Organization";case "@quicklaunch":return "Quick Launch";case "@backup":return "Backup and Restore";case "@control":return "Control Panel";case "@system":return "System";case "@filemanagers":return "File Managers";case "@weather":return "Weather";case "@clock":return "Clock";case "@gadgets":return "Gadget Gallery";case "@sticky":return "Notes";case "@calendar":return "Calendar";case "@computer":return "Computer";case "@browser":return BrowserPanel.NAME;case "@photos":return "Photo Gallery";case "@files":return "Files";case "@documents":return "Documents";case "@notes":return "Notepad";case "@appearance":return "Personalize";default:AppCatalog.Entry app=entries.get(id);return app==null?"Unavailable app":app.label;}
+        switch(id){case MediaLibrary.PLAYER:return MediaLibrary.PLAYER_TITLE;case MediaLibrary.CENTER:return MediaLibrary.CENTER_TITLE;case "@recycle":return "Recycle Bin";case "@workspaces":return "Saved Workspaces";case "@recent":return "Recent Items";case "@taskmanager":return "Task Manager";case "@welcome":return "Welcome Center";case "@organize":return "Desktop Organization";case "@quicklaunch":return "Quick Launch";case "@backup":return "Backup and Restore";case "@control":return "Control Panel";case "@system":return "System";case "@filemanagers":return "File Managers";case "@weather":return "Weather";case "@clock":return "Clock";case "@gadgets":return "Gadget Gallery";case "@sticky":return "Notes";case "@calendar":return "Calendar";case "@computer":return "Computer";case "@browser":return BrowserPanel.NAME;case "@photos":return "Photo Gallery";case "@files":return "Files";case "@documents":return "Documents";case "@pictures":return "Pictures";case "@music":return "Music";case "@flip3d":return "Flip 3D";case "@notes":return "Notepad";case "@appearance":return "Personalize";default:AppCatalog.Entry app=entries.get(id);return app==null?"Unavailable app":app.label;}
     }
     @Override public void open(String id){
         startMenu.hide();if(tray!=null)tray.dismiss();
@@ -397,9 +440,13 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
             case "@weather":weatherSettings();return;
             case "@sticky":stickyNote();return;
             case "@calendar":calendar();return;
-            case "@documents":explorer("@files","home");DesktopWindow documents=windows.get("@files");if(documents!=null&&documents.body instanceof VistaExplorer)((VistaExplorer)documents.body).openFavorite("documents");return;
-            case "@pictures":explorer("@files","home");DesktopWindow pictures=windows.get("@files");if(pictures!=null&&pictures.body instanceof VistaExplorer)((VistaExplorer)pictures.body).openDevice("pictures");return;
-            case "@music":explorer("@files","home");DesktopWindow music=windows.get("@files");if(music!=null&&music.body instanceof VistaExplorer)((VistaExplorer)music.body).openFavorite("music");return;
+            case "@documents":case "@pictures":case "@music":
+                if(!restoreTool(id)){
+                    explorer(id,"home");
+                    DesktopWindow folder=windows.get(id);
+                    if(folder!=null)((VistaExplorer)folder.body).openFavorite(id.substring(1));
+                }
+                return;
             case "@computer":computer();return;
             case "@notes":notes();return;
             case "@appearance":appearance();return;
@@ -463,6 +510,7 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
         desktopMenu.item("Screen resolution","computer",()->vistaAction("android:display"));
         desktopMenu.item("Gadgets","gadgets",this::gadgetGallery);
         desktopMenu.submenu("Desktop background","pictures",()->backgroundMenu(x,y));
+        if(wallpaper.hasSlideshow())desktopMenu.item("Next desktop background","pictures",wallpaper::next);
         desktopMenu.item("Personalize","appearance",this::appearance);
         if(!isHome()){desktopMenu.separator();desktopMenu.item("Make default home","orb",this::home);}
         showDesktopMenu(x,y);
@@ -474,22 +522,23 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
         desktopMenu.item("Control Panel","control",()->open("@control"));
         desktopMenu.item("Recycle Bin","delete",()->open("@recycle"));
         desktopMenu.item("Saved Workspaces…","computer",this::showWorkspaces);
+        desktopMenu.item("Flip 3D","appearance",()->open("@flip3d"));
         desktopMenu.item("Manage desktop shortcuts","computer",this::manageShortcuts);
         showDesktopMenu(x,y);
     }
     private void backgroundMenu(float x,float y){
         desktopMenu=new DesktopContextMenu(this,"Desktop backgrounds");
-        boolean stock=store.prefs.getString("wallpaper_photo","").isEmpty();
-        int current=store.prefs.getInt("wallpaper",AeroWallpaper.SEVEN);
-        for(int i=0;i<BackgroundPicker.THEMES.length;i++){
-            int theme=i;
-            desktopMenu.checked(BackgroundPicker.THEMES[i],stock&&current==theme,()->{
-                store.prefs.edit().putInt("wallpaper",theme).remove("wallpaper_photo").apply();
+        List<String> current=DesktopBackgrounds.current(store.prefs);
+        for(int i=0;i<DesktopBackgrounds.NAMES.length;i++){
+            int theme=i;String key=DesktopBackgrounds.stock(theme);
+            desktopMenu.checked(DesktopBackgrounds.NAMES[i],current.size()==1&&current.contains(key),()->{
+                android.content.SharedPreferences.Editor edit=store.prefs.edit();
+                DesktopBackgrounds.choose(edit,Collections.singletonList(key),AeroWallpaper.SEVEN);edit.apply();
                 vistaAction("wallpaper");
             });
         }
         desktopMenu.separator();
-        desktopMenu.item("Choose a picture…","pictures",()->open("setting:page:background"));
+        desktopMenu.item("Choose pictures or a slide show…","pictures",()->open("setting:page:background"));
         showDesktopMenu(x,y);
     }
     private void showDesktopMenu(float x,float y){
@@ -638,7 +687,8 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
             case "show-desktop":for(DesktopWindow w:windows.values())if(w.getParent()!=null&&w.getVisibility()==View.VISIBLE)w.minimize();startMenu.hide();return;
             case "storage-access":storageSetup.show(true);return;case "glass":wallpaper.appearanceChanged();return;case "startup-preview":if(startup!=null)startup.preview();return;
             case "chrome":applySystemChrome();return;case "desktop":renderDesktop();return;case "gadgets":sidebar.setActive(true);sidebar.refresh();return;case "wallpaper":wallpaper.theme(store.prefs.getInt("wallpaper",AeroWallpaper.SEVEN));return;
-            case "wallpaper-browse":try{startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION),305);}catch(ActivityNotFoundException ex){toast("No picture picker is available.");}return;
+            case "wallpaper-browse":chooseWallpapers(false);return;
+            case "wallpaper-folder":chooseWallpapers(true);return;
             case "profile":startMenu.refreshName();return;case "profile-pick":chooseProfilePicture();return;case "home":home();return;case "shortcuts":manageShortcuts();return;case "new-folder":organizer("@organize","new");return;
             case "reset-icons":Aero.dialog(this).setTitle("Restore desktop icons?").setMessage("Restore the original desktop icons and their order? Your notes and apps are kept.").setPositiveButton("Restore",(d,w)->{store.prefs.edit().remove("shortcuts").apply();renderDesktop();}).setNegativeButton("Cancel",null).show();return;
         }
@@ -652,6 +702,57 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
             default:action=Settings.ACTION_SETTINGS;
         }
         try{startActivity(new Intent(action));}catch(ActivityNotFoundException|SecurityException ex){launchSystem(new Intent(Settings.ACTION_SETTINGS));}
+    }
+    private void chooseWallpapers(boolean folder){
+        Intent pick=new Intent(folder?Intent.ACTION_OPEN_DOCUMENT_TREE:Intent.ACTION_OPEN_DOCUMENT)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        if(!folder)pick.setType("image/*").addCategory(Intent.CATEGORY_OPENABLE).putExtra(Intent.EXTRA_ALLOW_MULTIPLE,true);
+        try{startActivityForResult(pick,folder?PICK_WALLPAPER_FOLDER:PICK_WALLPAPERS);}
+        catch(ActivityNotFoundException ex){toast("No picture picker is available.");}
+    }
+    private boolean retainWallpaper(Uri uri){
+        if(uri==null||!DesktopBackgrounds.valid(uri.toString()))return false;
+        try{getContentResolver().takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);return true;}
+        catch(SecurityException ex){return false;}
+    }
+    private void importWallpapers(Intent data,boolean folder){
+        Uri chosen=data.getData();
+        if(folder){
+            if(!retainWallpaper(chosen)||!DocumentsContract.isTreeUri(chosen)){toast("This folder could not be kept for desktop backgrounds.");return;}
+            worker.execute(()->{
+                List<String> photos=new ArrayList<>();
+                try{
+                    Uri root=DocumentsContract.buildDocumentUriUsingTree(chosen,DocumentsContract.getTreeDocumentId(chosen));
+                    List<DocumentOps.Ref> items=DocumentOps.children(this,root,new DocumentOps.Cancel());
+                    items.sort(Comparator.comparing(ref->ref.item.name,String.CASE_INSENSITIVE_ORDER));
+                    for(DocumentOps.Ref ref:items){
+                        if(photos.size()==DesktopBackgrounds.LIMIT)break;
+                        if(!ref.item.directory()&&PhotoImage.picture(ref.item.name,ref.item.mime))photos.add(ref.uri.toString());
+                    }
+                }catch(Exception ignored){}
+                main.post(()->applyWallpaperImport(photos));
+            });
+            return;
+        }
+        Set<String> photos=new LinkedHashSet<>();
+        ClipData clip=data.getClipData();
+        if(clip!=null)for(int i=0;i<Math.min(DesktopBackgrounds.LIMIT,clip.getItemCount());i++){
+            Uri uri=clip.getItemAt(i).getUri();if(retainWallpaper(uri))photos.add(uri.toString());
+        }
+        if(chosen!=null&&photos.size()<DesktopBackgrounds.LIMIT&&!photos.contains(chosen.toString())&&retainWallpaper(chosen))photos.add(chosen.toString());
+        applyWallpaperImport(new ArrayList<>(photos));
+    }
+    private void applyWallpaperImport(List<String> photos){
+        if(destroyed||restoringBackup)return;
+        if(photos.isEmpty()){toast("No accessible pictures were found.");return;}
+        List<DesktopWindow> ordered=orderedWindows();Collections.reverse(ordered);
+        for(DesktopWindow window:ordered)if(window.getVisibility()==View.VISIBLE&&window.body instanceof VistaControlPanel){
+            VistaControlPanel panel=(VistaControlPanel)window.body;
+            if(panel.page().equals("background")){panel.wallpaperChosen(photos);return;}
+        }
+        open("setting:page:background");
+        DesktopWindow panel=windows.get("@control");
+        if(panel!=null&&panel.body instanceof VistaControlPanel)((VistaControlPanel)panel.body).wallpaperChosen(photos);
     }
     private void chooseProfilePicture(){chooseDocument("image/*",15);}
     private void chooseSearchFile(){if(LinkedFiles.list(store).length()>=LinkedFiles.MAX){toast("50 files are already linked. Remove a file link in Computer first.");return;}chooseDocument("*/*",16);}
@@ -822,20 +923,8 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
             return;
         }
         if(request==PICK_MEDIA){if(result==RESULT_OK&&data!=null)importMedia(data);return;}
-        if(request==305){
-            if(result==RESULT_OK&&data!=null&&data.getData()!=null){
-                Uri uri=data.getData();
-                try{getContentResolver().takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);}
-                catch(SecurityException ignored){}
-                List<DesktopWindow> ordered=orderedWindows();Collections.reverse(ordered);
-                for(DesktopWindow window:ordered)if(window.getVisibility()==View.VISIBLE&&window.body instanceof VistaControlPanel){
-                    VistaControlPanel panel=(VistaControlPanel)window.body;
-                    if(panel.page().equals("background")){panel.wallpaperChosen(uri.toString());return;}
-                }
-                open("setting:page:background");
-                DesktopWindow panel=windows.get("@control");
-                if(panel!=null&&panel.body instanceof VistaControlPanel)((VistaControlPanel)panel.body).wallpaperChosen(uri.toString());
-            }
+        if(request==PICK_WALLPAPERS||request==PICK_WALLPAPER_FOLDER){
+            if(result==RESULT_OK&&data!=null)importWallpapers(data,request==PICK_WALLPAPER_FOLDER);
             return;
         }
         if(request==304){if(result==RESULT_OK&&data!=null&&data.getData()!=null)openPhoto(data.getData(),null,"image/*",null,"@files");return;}
@@ -898,12 +987,12 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
     void storageReady(){root.post(()->{if(!destroyed&&!restoringBackup&&hasWindowFocus()){boolean force=restoreStorageSetup;restoreStorageSetup=false;storageSetup.show(force);}});}
     void storageFolderSetup(){afterDesktopReady(()->{explorer("@computer","computer");chooseLinkedFolder("@computer");});}
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);closeMediaCenter();DesktopWindow currentBrowser=windows.get("@browser");if(currentBrowser!=null&&currentBrowser.body instanceof BrowserPanel)((BrowserPanel)currentBrowser.body).exitFullScreen();handleRequestedTool();if(desktopMenu!=null)desktopMenu.dismiss();if(tray!=null)tray.dismiss();if(startMenu!=null){startMenu.hide();startMenu.refreshHome();}}
-    @Override protected void onResume(){super.onResume();if(wallpaper!=null)wallpaper.reload();if(brightness!=null)brightness.apply();if(restoringBackup)return;boolean access=StorageAccess.has(this);if(storageAllowed!=access){storageAllowed=access;filesChanged();}pausedSession=null;if(startMenu!=null)startMenu.refreshHome();main.removeCallbacks(clockTick);main.post(clockTick);if(store!=null)scanApps();if(sidebar!=null)sidebar.setActive(true);if(startup!=null)startup.resume();if(tray!=null)tray.start();if(weatherLocation!=null)weatherLocation.resume();for(DesktopWindow tool:windows.values()){if(tool.body instanceof TaskManagerPanel)((TaskManagerPanel)tool.body).active(true);if(tool.body instanceof GadgetPanel)((GadgetPanel)tool.body).active(true);if(tool.body instanceof BrowserPanel)((BrowserPanel)tool.body).active(true);if(tool.body instanceof PhotoGallery)((PhotoGallery)tool.body).active(true);}}
+    @Override protected void onResume(){super.onResume();if(wallpaper!=null)wallpaper.resumeSlides();if(brightness!=null)brightness.apply();if(restoringBackup)return;boolean access=StorageAccess.has(this);if(storageAllowed!=access){storageAllowed=access;filesChanged();}pausedSession=null;if(startMenu!=null)startMenu.refreshHome();main.removeCallbacks(clockTick);main.post(clockTick);if(store!=null)scanApps();if(sidebar!=null)sidebar.setActive(true);if(startup!=null)startup.resume();if(tray!=null)tray.start();if(weatherLocation!=null)weatherLocation.resume();for(DesktopWindow tool:windows.values()){if(tool.body instanceof TaskManagerPanel)((TaskManagerPanel)tool.body).active(true);if(tool.body instanceof GadgetPanel)((GadgetPanel)tool.body).active(true);if(tool.body instanceof BrowserPanel)((BrowserPanel)tool.body).active(true);if(tool.body instanceof PhotoGallery)((PhotoGallery)tool.body).active(true);}}
     @Override protected void onStop(){
         if(playback!=null)playback.player.pause();
         super.onStop();
     }
-    @Override protected void onPause(){if(workspaceDialog!=null)workspaceDialog.dismiss();DesktopSounds.stop();if(previews!=null)previews.dismiss();for(DesktopWindow tool:windows.values()){if(tool.body instanceof PhotoGallery)((PhotoGallery)tool.body).active(false);if(tool.body instanceof BrowserPanel){((BrowserPanel)tool.body).save();((BrowserPanel)tool.body).active(false);}if(tool.body instanceof TaskManagerPanel)((TaskManagerPanel)tool.body).active(false);tool.dismissSystemMenu();tool.cancelCaptionDrag();if(tool.body instanceof GadgetPanel)((GadgetPanel)tool.body).active(false);if(tool.body instanceof VistaExplorer)((VistaExplorer)tool.body).dismissMenus();}if(tray!=null)tray.stop();if(startup!=null)startup.pause();pausedSession=restoringBackup?null:captureSession();if(desktopMenu!=null)desktopMenu.dismiss();super.onPause();main.removeCallbacks(clockTick);if(sidebar!=null)sidebar.setActive(false);if(weatherLocation!=null)weatherLocation.pause();if(startMenu!=null)startMenu.hide();}
+    @Override protected void onPause(){if(wallpaper!=null)wallpaper.pauseSlides();if(workspaceDialog!=null)workspaceDialog.dismiss();DesktopSounds.stop();if(previews!=null)previews.dismiss();for(DesktopWindow tool:windows.values()){if(tool.body instanceof PhotoGallery)((PhotoGallery)tool.body).active(false);if(tool.body instanceof BrowserPanel){((BrowserPanel)tool.body).save();((BrowserPanel)tool.body).active(false);}if(tool.body instanceof TaskManagerPanel)((TaskManagerPanel)tool.body).active(false);tool.dismissSystemMenu();tool.cancelCaptionDrag();if(tool.body instanceof GadgetPanel)((GadgetPanel)tool.body).active(false);if(tool.body instanceof VistaExplorer)((VistaExplorer)tool.body).dismissMenus();}if(tray!=null)tray.stop();if(startup!=null)startup.pause();pausedSession=restoringBackup?null:captureSession();if(desktopMenu!=null)desktopMenu.dismiss();super.onPause();main.removeCallbacks(clockTick);if(sidebar!=null)sidebar.setActive(false);if(weatherLocation!=null)weatherLocation.pause();if(startMenu!=null)startMenu.hide();}
     @Override public void onConfigurationChanged(android.content.res.Configuration config){
         super.onConfigurationChanged(config);if(previews!=null)previews.dismiss();String next=config.orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE?"landscape":"portrait";
         if(!next.equals(layoutKey)){arrangementUndo.clear();for(DesktopWindow tool:windows.values())if(tool.getParent()!=null){tool.dismissSystemMenu();tool.settle();tool.orientation(next);}layoutKey=next;desktop.orientation(next);sidebar.orientation(next);}
@@ -924,7 +1013,7 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
             JSONObject session=new JSONObject(saved);JSONArray tools=session.optJSONArray("tools");
             if(tools!=null)for(int i=0;i<tools.length();i++){
                 JSONObject item=tools.optJSONObject(i);if(item==null)continue;String id=item.optString("id");
-                if(!id.startsWith("@organizer:")&&!id.startsWith("folder:")&&!validExplorerId(id)&&!FolderLinks.id(id)&&!(id.startsWith("@gadget:")&&GadgetCatalog.extra(id.substring(8)))&&!Arrays.asList("@notes","@sticky","@calendar","@gadgets","@clock","@weather","@appearance","@computer","@control","@system","@files","@filemanagers","@organize","@quicklaunch","@backup","@welcome","@browser","@photos","@taskmanager","@recycle","@recent",MediaLibrary.PLAYER).contains(id)&&!store.isFolder(id))continue;
+                if(!id.startsWith("@organizer:")&&!id.startsWith("folder:")&&!validExplorerId(id)&&!FolderLinks.id(id)&&!(id.startsWith("@gadget:")&&GadgetCatalog.extra(id.substring(8)))&&!Arrays.asList("@notes","@sticky","@calendar","@gadgets","@clock","@weather","@appearance","@computer","@control","@system","@files","@documents","@pictures","@music","@filemanagers","@organize","@quicklaunch","@backup","@welcome","@browser","@photos","@taskmanager","@recycle","@recent",MediaLibrary.PLAYER).contains(id)&&!store.isFolder(id))continue;
                 if(id.startsWith("@organizer:")||(id.startsWith("folder:")&&!store.isFolder(id)))organizer(id,"desktop");else open(id);DesktopWindow tool=windows.get(id);if(tool==null)continue;tool.readGeometry(item.optJSONObject("geometry"));tool.setVisibility(item.optBoolean("visible",true)?View.VISIBLE:View.GONE);ToolViewState.restore(tool,item.optJSONObject("ui"));
             }
             JSONArray hidden=session.optJSONArray("desktopHidden");if(hidden!=null)for(int i=0;i<hidden.length();i++){String id=hidden.optString(i);DesktopWindow tool=windows.get(id);if(tool!=null&&tool.getVisibility()!=View.VISIBLE)desktopHidden.put(id,tool);}
@@ -960,7 +1049,7 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
         }
     }
     private boolean restoreTool(String id){DesktopWindow current=windows.get(id);if(current!=null&&current.getParent()!=null){current.restore();return true;}return false;}
-    private void gadgetGallery(){startMenu.hide();if(restoreTool("@gadgets"))return;window("@gadgets","Desktop Gadget Gallery",new GadgetGallery(this,store,sidebar.weather,new GadgetGallery.Host(){public void open(String id){MainActivity.this.open(id);}public void action(String id){vistaAction(id);}public void changed(){sidebar.rebuild();}public void reveal(){sidebar.reveal();}}));}
+    private void gadgetGallery(){startMenu.hide();if(restoreTool("@gadgets"))return;window("@gadgets","Desktop Gadget Gallery",new GadgetGallery(this,store,sidebar.weather,new GadgetGallery.Host(){public void open(String id){MainActivity.this.open(id);}public void action(String id){vistaAction(id);}public void changed(){sidebar.rebuild();}public void reveal(){sidebar.reveal();}public void align(String id){sidebar.alignAdded(id);}}));}
     private void gadgetPanel(String kind){if(!GadgetCatalog.extra(kind))return;String id="@gadget:"+kind;if(restoreTool(id))return;window(id,GadgetCatalog.title(kind),new GadgetPanel(this,store,kind,sidebar.feeds,sidebar.hardware,new GadgetPanel.Host(){public void open(String id){MainActivity.this.open(id);}public void action(String id){vistaAction(id);}public void changed(){sidebar.refresh();}public void feed(String url){List<String> enabled=store.gadgets();if(!enabled.contains("feeds")){enabled.add("feeds");store.gadgets(enabled);sidebar.rebuild();sidebar.reveal();}sidebar.feeds.configure(url);}public void refreshFeed(){sidebar.feeds.refresh(true);}public void article(String url){Uri uri=Uri.parse(url);if(Arrays.asList("http","https").contains(uri.getScheme()))launchSystem(new Intent(Intent.ACTION_VIEW,uri));}}));}
     private void clockOptions(){controlPanel("@clock","Clock settings","clock");}
     private void stickyNote(){

@@ -36,9 +36,9 @@ final class AeroGlass extends Drawable {
         if(transparent&&getCallback() instanceof View)wallpaper.drawGlass(c,(View)getCallback());
         int[] colors;
         if(style==WINDOW)colors=new int[]{0xb2bedbe8,0x88b2d3e4,0x9b7f9db1,0xccc0d9e7};
-        else if(style==START)colors=new int[]{0xe147555e,0xdc263b49,0xe0162936,0xe82a414e};
+        else if(style==START)colors=new int[]{0xdb426584,0xd32a4967,0xe01d3550,0xe42e4c68};
         else if(style==TASKBUTTON)colors=active?new int[]{0xeb557e98,0xe62c526b,0xee234056,0xe947718c}:new int[]{0x667c94a4,0x55536c7e,0x55384f60,0x66647e91};
-        else if(style==TASKBAR)colors=new int[]{0xf343535b,0xe72b3e4a,0xf012222c,0xee0c1922};
+        else if(style==TASKBAR)colors=new int[]{0xe75b809f,0xdd365574,0xee19354f,0xf011253b};
         else colors=new int[]{0x33212b33,0x4423313e,0x55202a34,0x55202a34};
         int tint=TINTS[Math.max(0,Math.min(TINTS.length-1,prefs.getInt("aero_color",0)))];float intensity=Math.max(0,Math.min(100,prefs.getInt("aero_intensity",45)))/100f;
         for(int i=0;i<colors.length;i++){int tintAlpha=transparent?Color.alpha(colors[i]):255;int target=style==WINDOW?mix(0xffe2edf3,tint,.6f):style==SIDEBAR?mix(0xff0b2435,tint,.35f):mix(0xff0d1e2b,tint,.45f);colors[i]=(mix(colors[i],target,intensity*.82f)&0x00ffffff)|(tintAlpha<<24);if(style==WINDOW&&!active)colors[i]=mix(colors[i],0xffc6d0d5,.38f)|(tintAlpha<<24);}

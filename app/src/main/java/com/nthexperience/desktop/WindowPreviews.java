@@ -10,9 +10,9 @@ import java.util.*;
 
 /** In-process previews of launcher windows. */
 final class WindowPreviews {
-    interface Host {java.util.List<DesktopWindow> windows();java.util.List<String> external();String label(String id);void open(String id);View wallpaper();void showDesktop();}
+    interface Host {java.util.List<DesktopWindow> windows();java.util.List<String> external();String label(String id);void open(String id);View wallpaper();void showDesktop();void preparePreview();}
     private final Activity activity;private final Host host;private final Handler main=new Handler(Looper.getMainLooper());
-    private Dialog dialog;private PopupWindow hover,folderPicker;private Runnable pending;
+    private Dialog dialog;private PopupWindow folderPicker;private Runnable pending;
     private final Runnable dismissFolderHover=()->{if(folderPicker!=null&&!folderPicker.isFocusable())folderPicker.dismiss();};
     WindowPreviews(Activity activity,Host host){this.activity=activity;this.host=host;}
     static boolean allowed(DesktopWindow window){return !(window.body instanceof BrowserPanel)||!((BrowserPanel)window.body).hasPrivateTabs();}
@@ -29,84 +29,163 @@ final class WindowPreviews {
             Canvas canvas=new Canvas(bitmap);
             canvas.scale(scale,scale);
             source.draw(canvas);
+            if(source instanceof DesktopWindow&&((DesktopWindow)source).body instanceof MediaPanel){
+                TextureView video=((MediaPanel)((DesktopWindow)source).body).videoSurface();
+                if(video.isShown()&&video.isAvailable()){
+                    int[] outer=new int[2],inner=new int[2];source.getLocationInWindow(outer);video.getLocationInWindow(inner);
+                    Bitmap frame=video.getBitmap(Math.max(1,Math.round(video.getWidth()*scale)),Math.max(1,Math.round(video.getHeight()*scale)));
+                    if(frame!=null){
+                        int left=inner[0]-outer[0],top=inner[1]-outer[1];
+                        canvas.drawBitmap(frame,null,new Rect(left,top,left+video.getWidth(),top+video.getHeight()),null);
+                        frame.recycle();
+                    }
+                }
+            }
             return bitmap;
         }catch(RuntimeException|OutOfMemoryError ex){
             if(bitmap!=null)bitmap.recycle();
             return null;
         }
     }
-    void folders(View anchor,List<DesktopWindow> windows,boolean sticky){
-        if(!sticky&&folderPicker!=null&&folderPicker.isFocusable())return;
-        dismiss();
-        if(!anchor.isAttachedToWindow()||windows.isEmpty())return;
-        if(sticky)hideKeyboard();
-        Context context=activity;
-        int gap=Aero.dp(context,8);
-        Rect safe=new Rect();anchor.getWindowVisibleDisplayFrame(safe);
-        if(safe.width()<Aero.dp(context,110))return;
-        int cardWidth=Math.min(Aero.dp(context,174),Math.max(Aero.dp(context,70),(safe.width()-4*gap)/Math.min(2,windows.size())));
-        int width=Math.min(safe.width()-2*gap,windows.size()*(cardWidth+gap)+gap);
-        int height=Aero.dp(context,149);
-        HorizontalScrollView scroll=new HorizontalScrollView(context);
-        scroll.setContentDescription("Folder windows");scroll.setHorizontalScrollBarEnabled(false);
-        if(!sticky)scroll.setOnHoverListener((v,event)->{
-            main.removeCallbacks(dismissFolderHover);
-            if(event.getActionMasked()==MotionEvent.ACTION_HOVER_EXIT)main.postDelayed(dismissFolderHover,250);
+    static final class Card {
+        final String title, detail;
+        final View source;
+        final Runnable open, close;
+        Card(String title,String detail,View source,Runnable open,Runnable close){
+            this.title=title;this.detail=detail;this.source=source;this.open=open;this.close=close;
+        }
+    }
+    void bindTask(View button,List<DesktopWindow> windows,boolean mouse,Runnable commands){
+        java.util.function.Supplier<List<Card>> cards=()->{
+            List<Card> result=new ArrayList<>();
+            for(DesktopWindow window:windows){
+                if(window.getParent()==null)continue;
+                if(window.body instanceof BrowserPanel&&allowed(window)){
+                    BrowserPanel browser=(BrowserPanel)window.body;
+                    if(browser.tabCount()>1){result.addAll(browser.previewCards(window));continue;}
+                }
+                boolean visible=allowed(window);
+                result.add(new Card(window.caption(),visible?"Preview unavailable":"InPrivate — preview hidden",
+                        visible?window:null,window::restore,window::closeWindow));
+            }
+            return result;
+        };
+        bind(button,cards,windows.size()>1?"Folder windows":null,mouse,commands);
+        if(windows.size()>1)button.setOnClickListener(v->showCards(button,cards.get(),"Folder windows",true,commands));
+    }
+    void bindApp(View button,String title,boolean running,boolean mouse,Runnable open,Runnable commands){
+        bind(button,()->Collections.singletonList(new Card(title,running?"Android app · switch to app":"Pinned shortcut",
+                button instanceof ViewGroup?((ViewGroup)button).getChildAt(0):null,open,null)),null,mouse&&running,commands);
+    }
+    private void bind(View button,java.util.function.Supplier<List<Card>> cards,String group,boolean mouse,Runnable commands){
+        button.setOnLongClickListener(v->{showCards(button,cards.get(),group,true,commands);return true;});
+        if(!mouse)return;
+        button.setOnHoverListener((v,event)->{
+            if(!event.isFromSource(InputDevice.SOURCE_MOUSE)&&!event.isFromSource(InputDevice.SOURCE_STYLUS))return false;
+            if(event.getActionMasked()==MotionEvent.ACTION_HOVER_ENTER){
+                main.removeCallbacks(dismissFolderHover);
+                if(pending!=null)main.removeCallbacks(pending);
+                pending=()->{pending=null;showCards(button,cards.get(),group,false,commands);};
+                main.postDelayed(pending,450);
+            }else if(event.getActionMasked()==MotionEvent.ACTION_HOVER_EXIT){
+                if(pending!=null){main.removeCallbacks(pending);pending=null;}
+                main.postDelayed(dismissFolderHover,300);
+            }
             return false;
         });
-        scroll.setBackground(Aero.gloss(context,new int[]{0xff597e9c,0xff345774,0xff17364e},6,0xff9dbbd0));
+    }
+    private void showCards(View anchor,List<Card> cards,String group,boolean sticky,Runnable commands){
+        if(!anchor.isAttachedToWindow()||cards.isEmpty()||!sticky&&(!activity.hasWindowFocus()
+                ||folderPicker!=null&&folderPicker.isFocusable()))return;
+        dismiss();
+        if(sticky){host.preparePreview();hideKeyboard();}
+        Context context=activity;
+        int gap=Aero.dp(context,7);
+        Rect safe=new Rect();anchor.getWindowVisibleDisplayFrame(safe);
+        if(safe.width()<Aero.dp(context,110))return;
+        int cardWidth=Math.min(Aero.dp(context,190),(safe.width()-4*gap)/Math.min(2,cards.size()));
+        int width=Math.min(safe.width()-2*gap,cards.size()*(cardWidth+gap)+gap);
+        int height=Aero.dp(context,sticky?179:149);
+        LinearLayout shell=Aero.column(context);
+        shell.setContentDescription(group==null?(cards.size()>1?"Browser tab previews":"Window preview for "+cards.get(0).title):group);
+        shell.setBackground(Aero.gloss(context,new int[]{0xff6088ab,0xff365a7c,0xff183c5d},6,0xff9dbbd0));
+        HorizontalScrollView scroll=new HorizontalScrollView(context);scroll.setHorizontalScrollBarEnabled(cards.size()>2);
+        if(!sticky)scroll.setOnHoverListener((v,event)->{
+            main.removeCallbacks(dismissFolderHover);
+            if(event.getActionMasked()==MotionEvent.ACTION_HOVER_EXIT)main.postDelayed(dismissFolderHover,300);
+            return false;
+        });
+        shell.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         LinearLayout row=new LinearLayout(context);row.setPadding(gap,gap,0,gap);
         scroll.addView(row,new HorizontalScrollView.LayoutParams(-2,-1));
-        Map<DesktopWindow,ImageView> images=new LinkedHashMap<>();
-        for(DesktopWindow window:windows){
-            LinearLayout card=Aero.column(context);Aero.pad(card,5);
-            card.setFocusable(true);card.setContentDescription("Switch to "+window.caption());
-            card.setBackground(Aero.panel(context,0xffeaf6fe,0xffc7dfee,3,0xff7199b6));
-            TextView name=Aero.text(context,window.caption(),12,Aero.INK);
+        Map<Card,ImageView> images=new LinkedHashMap<>();
+        for(Card target:cards){
+            LinearLayout card=Aero.column(context);Aero.pad(card,4);
+            card.setFocusable(true);card.setContentDescription("Switch to "+target.title);
+            card.setBackground(Aero.panel(context,0xffedf7ff,0xffc7dfee,3,0xff7199b6));
+            LinearLayout header=new LinearLayout(context);
+            TextView name=Aero.text(context,target.title,12,Aero.INK);
             name.setSingleLine();name.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            card.addView(name,new LinearLayout.LayoutParams(-1,Aero.dp(context,25)));
-            ImageView thumbnail=new ImageView(context);thumbnail.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            thumbnail.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-            card.addView(thumbnail,new LinearLayout.LayoutParams(-1,0,1));images.put(window,thumbnail);
-            card.setOnClickListener(v->{dismiss();if(window.getParent()!=null)window.restore();});
+            header.addView(name,new LinearLayout.LayoutParams(0,-1,1));
+            if(target.close!=null){
+                TextView close=Aero.button(context,"×",()->{dismiss();target.close.run();});
+                close.setMinHeight(0);close.setPadding(0,0,0,0);
+                close.setContentDescription("Close "+target.title);
+                header.addView(close,new LinearLayout.LayoutParams(Aero.dp(context,29),-1));
+            }
+            card.addView(header,new LinearLayout.LayoutParams(-1,Aero.dp(context,26)));
+            FrameLayout body=new FrameLayout(context);
+            TextView detail=Aero.text(context,target.detail,11,0xff34566d);
+            detail.setGravity(Gravity.CENTER);body.addView(detail,new FrameLayout.LayoutParams(-1,-1));
+            if(target.source!=null){
+                ImageView image=new ImageView(context);image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                image.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+                boolean icon=target.close==null;
+                body.addView(image,new FrameLayout.LayoutParams(icon?Aero.dp(context,44):-1,icon?Aero.dp(context,44):-1,Gravity.CENTER));
+                if(icon){detail.setGravity(Gravity.CENTER_HORIZONTAL|Gravity.BOTTOM);detail.setPadding(0,0,0,Aero.dp(context,5));}
+                images.put(target,image);
+            }
+            card.addView(body,new LinearLayout.LayoutParams(-1,0,1));
+            card.setOnClickListener(v->{dismiss();target.open.run();});
+            card.setOnHoverListener((v,event)->{
+                boolean over=event.getActionMasked()!=MotionEvent.ACTION_HOVER_EXIT;
+                if(over)main.removeCallbacks(dismissFolderHover);
+                else if(!sticky)main.postDelayed(dismissFolderHover,300);
+                card.setBackground(over?Aero.panel(context,0xfff3fbff,0xffa7d3f3,3,0xfff7fbff)
+                        :Aero.panel(context,0xffedf7ff,0xffc7dfee,3,0xff7199b6));
+                return false;
+            });
             LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(cardWidth,-1);size.rightMargin=gap;row.addView(card,size);
         }
-        PopupWindow picker=new PopupWindow(scroll,width,height,sticky);folderPicker=picker;
+        if(sticky){
+            TextView options=Aero.text(context,"Window commands  ▸",11,Color.WHITE);
+            options.setGravity(Gravity.CENTER);options.setContentDescription("Taskbar item commands");
+            options.setOnClickListener(v->{dismiss();if(anchor.isAttachedToWindow())commands.run();});
+            shell.addView(options,new LinearLayout.LayoutParams(-1,Aero.dp(context,29)));
+        }
+        PopupWindow picker=new PopupWindow(shell,width,height,sticky);folderPicker=picker;
         picker.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
         picker.setOutsideTouchable(sticky);picker.setInputMethodMode(PopupWindow.INPUT_METHOD_NOT_NEEDED);
         picker.setElevation(Aero.dp(context,8));
         Runnable refresh=new Runnable(){@Override public void run(){
             if(folderPicker!=picker||!picker.isShowing())return;
-            boolean hasWindows=false;
-            for(Map.Entry<DesktopWindow,ImageView> entry:images.entrySet()){
-                DesktopWindow window=entry.getKey();ImageView image=entry.getValue();
-                if(window.getParent()==null){((View)image.getParent()).setVisibility(View.GONE);continue;}
-                hasWindows=true;
-                if(window.getVisibility()==View.VISIBLE||image.getDrawable()==null){
-                    Bitmap next=snapshot(window);
-                    if(next!=null)image.setImageBitmap(next);
+            for(Map.Entry<Card,ImageView> entry:images.entrySet()){
+                Card target=entry.getKey();View source=target.source;ImageView image=entry.getValue();
+                if(source instanceof DesktopWindow&&!allowed((DesktopWindow)source)){picker.dismiss();return;}
+                if(image.getDrawable()!=null&&(target.close==null||!source.isShown()))continue;
+                Bitmap next=capture(source,300,185);
+                if(next!=null){
+                    image.setImageBitmap(next);
+                    if(target.close!=null)((ViewGroup)image.getParent()).getChildAt(0).setVisibility(View.GONE);
                 }
             }
-            if(hasWindows)main.postDelayed(this,500);else picker.dismiss();
+            if(!images.isEmpty())main.postDelayed(this,500);
         }};
         picker.setOnDismissListener(()->{main.removeCallbacks(refresh);main.removeCallbacks(dismissFolderHover);if(folderPicker==picker)folderPicker=null;});
         int[] position=new int[2];anchor.getLocationOnScreen(position);
         int x=Math.max(safe.left+gap,Math.min(position[0]+(anchor.getWidth()-width)/2,safe.right-width-gap));
         picker.showAtLocation(anchor.getRootView(),Gravity.TOP|Gravity.LEFT,x,Math.max(safe.top,position[1]-height-gap/2));
         refresh.run();
-    }
-    void bindFolders(View button,List<DesktopWindow> windows){
-        button.setOnHoverListener((v,event)->{
-            if(!event.isFromSource(InputDevice.SOURCE_MOUSE)&&!event.isFromSource(InputDevice.SOURCE_STYLUS))return false;
-            if(event.getActionMasked()==MotionEvent.ACTION_HOVER_ENTER){
-                if(pending!=null)main.removeCallbacks(pending);
-                pending=()->{pending=null;folders(button,windows,false);};main.postDelayed(pending,450);
-            }else if(event.getActionMasked()==MotionEvent.ACTION_HOVER_EXIT){
-                if(pending!=null){main.removeCallbacks(pending);pending=null;}
-                if(folderPicker!=null&&!folderPicker.isFocusable())main.postDelayed(dismissFolderHover,250);
-            }
-            return false;
-        });
     }
     void show(){show(host.windows(),"Switch Windows",true);}
     void flip(){
@@ -157,10 +236,6 @@ final class WindowPreviews {
         ScrollView scroll=new ScrollView(activity);scroll.addView(body);AlertDialog view=Aero.dialog(activity).setTitle(title).setView(scroll).setNegativeButton("Close",null).create();dialog=view;view.setOnDismissListener(d->{images.clear();if(dialog==view)dialog=null;});view.show();
         int height=Math.round(activity.getResources().getDisplayMetrics().heightPixels*.75f);dialog.getWindow().setLayout(Math.min(Aero.dp(activity,400),activity.getResources().getDisplayMetrics().widthPixels-Aero.dp(activity,24)),height);
     }
-    void bind(View button,DesktopWindow window){button.setOnHoverListener((v,event)->{
-        if(!event.isFromSource(InputDevice.SOURCE_MOUSE)&&!event.isFromSource(InputDevice.SOURCE_STYLUS))return false;
-        if(event.getActionMasked()==MotionEvent.ACTION_HOVER_ENTER){hideHover();pending=()->{if(!button.isAttachedToWindow()||!activity.hasWindowFocus()||window.getParent()==null)return;LinearLayout content=Aero.column(activity);content.setContentDescription("Window preview for "+window.caption());Aero.pad(content,8);content.setBackground(Aero.panel(activity,0xffedf8ff,0xffc8dfec,3,0xff607f92));content.addView(Aero.text(activity,window.caption(),13,Aero.INK));Bitmap image=snapshot(window);if(image!=null){ImageView view=new ImageView(activity);view.setImageBitmap(image);view.setScaleType(ImageView.ScaleType.FIT_CENTER);content.addView(view,new LinearLayout.LayoutParams(-1,Aero.dp(activity,150)));}else content.addView(Aero.text(activity,allowed(window)?"Preview unavailable":"InPrivate — preview hidden",12,Aero.INK));hover=new PopupWindow(content,Aero.dp(activity,260),Aero.dp(activity,190),false);hover.setClippingEnabled(true);hover.showAsDropDown(button,0,-button.getHeight()-Aero.dp(activity,195));};main.postDelayed(pending,450);}
-        if(event.getActionMasked()==MotionEvent.ACTION_HOVER_EXIT)hideHover();return false;});}
-    private void hideHover(){if(pending!=null)main.removeCallbacks(pending);pending=null;if(hover!=null){hover.dismiss();hover=null;}}
-    boolean dismiss(){boolean was=dialog!=null||hover!=null||folderPicker!=null;hideHover();if(folderPicker!=null)folderPicker.dismiss();if(dialog!=null){Dialog old=dialog;dialog=null;old.dismiss();}return was;}
+    private void hideHover(){if(pending!=null)main.removeCallbacks(pending);pending=null;main.removeCallbacks(dismissFolderHover);}
+    boolean dismiss(){boolean was=dialog!=null||folderPicker!=null;hideHover();if(folderPicker!=null)folderPicker.dismiss();if(dialog!=null){Dialog old=dialog;dialog=null;old.dismiss();}return was;}
 }

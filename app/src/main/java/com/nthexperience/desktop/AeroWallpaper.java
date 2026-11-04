@@ -9,12 +9,22 @@ import android.graphics.Path;
 import android.graphics.RadialGradient;
 import android.graphics.Shader;
 import android.view.View;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /** Original, resolution-independent aurora artwork. No Microsoft assets. */
 final class AeroWallpaper extends View {
     static final int SEVEN = 3;
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path path = new Path();
+    private final SevenScenery scenery=new SevenScenery();
+    private List<String> slides=Collections.emptyList();
+    private List<String> order=Collections.emptyList();
+    private int cursor,interval;
+    private boolean shuffle,resumed;
+    private String rendered="";
+    private final Runnable rotation=this::next;
     private int theme;private boolean following,closed;private Bitmap photo;private int photoWidth,photoHeight,background=0xff0a263b;private String position="Fill";private android.os.CancellationSignal request;
     private static final java.util.concurrent.ExecutorService images=java.util.concurrent.Executors.newSingleThreadExecutor();
     private static Bitmap artwork,wideArtwork;
@@ -25,13 +35,14 @@ final class AeroWallpaper extends View {
     AeroWallpaper(Context context,int theme){this(context,theme,true);}
     AeroWallpaper(Context context, int theme,boolean following) { super(context); this.theme = theme;this.following=following;
         if(artwork==null){try{artwork=BitmapFactory.decodeStream(context.getAssets().open("wallpapers/aero-aurora.webp"));}catch(java.io.IOException ignored){}} if(wideArtwork==null){try{wideArtwork=BitmapFactory.decodeStream(context.getAssets().open("wallpapers/aero-aurora-landscape.webp"));}catch(java.io.IOException ignored){}} setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);if(following)reload(); }
-    void theme(int value) { theme = value;if(following)reload();softened=null;appearanceChanged(); }
+    void theme(int value) { if(following)reload();else theme=value;softened=null;appearanceChanged(); }
     void appearanceChanged(){invalidate();for(java.util.Iterator<java.lang.ref.WeakReference<AeroGlass>> i=surfaces.iterator();i.hasNext();){AeroGlass glass=i.next().get();if(glass==null)i.remove();else glass.invalidateSelf();}}
     void register(AeroGlass glass){surfaces.add(new java.lang.ref.WeakReference<>(glass));}
     @Override protected void onDraw(Canvas c) {
         float w = getWidth(), h = getHeight();
         if(photo!=null&&!photo.isRecycled()){drawPhoto(c,w,h);return;}
         if(theme==SEVEN){drawSeven(c,w,h);return;}
+        if(theme>SEVEN&&theme<DesktopBackgrounds.NAMES.length){scenery.draw(c,w,h,theme);return;}
         if(artwork!=null){
             drawArtwork(c,w,h);return;
         }
@@ -58,13 +69,73 @@ final class AeroWallpaper extends View {
         for(int i=0;i<24;i++) { float x=((i*167+41)%997)/997f*w, y=((i*107+73)%997)/997f*h; c.drawCircle(x,y,1+(i%3),paint); }
     }
     void draft(int theme,Bitmap image,int width,int height,String position,int background){this.theme=theme;photo=image;photoWidth=width;photoHeight=height;this.position=position;this.background=background;softened=null;appearanceChanged();}
-    void reload(){if(closed||!following)return;android.content.SharedPreferences prefs=getContext().getSharedPreferences("desktop",0);position=prefs.getString("wallpaper_position","Fill");background=BackgroundPicker.COLORS[Math.max(0,Math.min(BackgroundPicker.COLORS.length-1,prefs.getInt("wallpaper_bg",0)))];String uri=prefs.getString("wallpaper_photo","");if(request!=null)request.cancel();if(uri.isEmpty()){photo=null;softened=null;appearanceChanged();return;}android.os.CancellationSignal signal=new android.os.CancellationSignal();request=signal;android.content.Context context=getContext().getApplicationContext();images.execute(()->{PhotoImage result=null;try{result=PhotoImage.read(context,android.net.Uri.parse(uri),signal,2048,4000000);}catch(Exception|OutOfMemoryError ignored){}PhotoImage decoded=result;post(()->{if(closed||signal.isCanceled()){if(decoded!=null)decoded.bitmap.recycle();return;}photo=decoded==null?null:decoded.bitmap;photoWidth=decoded==null?0:decoded.width;photoHeight=decoded==null?0:decoded.height;softened=null;appearanceChanged();});});}
+    void resumeSlides(){resumed=true;reload();}
+    void pauseSlides(){resumed=false;removeCallbacks(rotation);}
+    boolean hasSlideshow(){return slides.size()>1;}
+    void reload(){
+        if(closed||!following)return;
+        android.content.SharedPreferences prefs=getContext().getSharedPreferences("desktop",0);
+        String placement=prefs.getString("wallpaper_position","Fill");
+        int color=BackgroundPicker.COLORS[Math.max(0,Math.min(BackgroundPicker.COLORS.length-1,prefs.getInt("wallpaper_bg",0)))];
+        boolean geometryChanged=!position.equals(placement)||color!=background;
+        position=placement;background=color;
+        List<String> selected=DesktopBackgrounds.current(prefs);
+        boolean random=prefs.getBoolean(DesktopBackgrounds.SHUFFLE,false);
+        interval=prefs.getInt(DesktopBackgrounds.INTERVAL,DesktopBackgrounds.DEFAULT_INTERVAL);
+        if(!DesktopBackgrounds.intervalValid(interval))interval=DesktopBackgrounds.DEFAULT_INTERVAL;
+        if(!selected.equals(slides)||random!=shuffle){
+            slides=selected;shuffle=random;cursor=0;
+            order=new ArrayList<>(slides);
+            if(shuffle&&order.size()>2)Collections.shuffle(order.subList(1,order.size()));
+        }
+        display(order.get(cursor));
+        if(geometryChanged){softened=null;appearanceChanged();}
+        schedule();
+    }
+    void next(){
+        if(closed||slides.size()<2)return;
+        String previous=order.get(cursor);
+        cursor=(cursor+1)%order.size();
+        if(cursor==0&&shuffle){
+            Collections.shuffle(order);
+            if(order.get(0).equals(previous))Collections.swap(order,0,1);
+        }
+        display(order.get(cursor));schedule();
+    }
+    private void schedule(){
+        removeCallbacks(rotation);
+        if(resumed&&slides.size()>1)postDelayed(rotation,interval*1000L);
+    }
+    private void display(String key){
+        if(key.equals(rendered))return;
+        rendered=key;
+        if(request!=null)request.cancel();
+        int id=DesktopBackgrounds.stockId(key);
+        theme=id>=0?id:getContext().getSharedPreferences("desktop",0).getInt("wallpaper",SEVEN);
+        photo=null;softened=null;appearanceChanged();
+        if(id>=0)return;
+        android.os.CancellationSignal signal=new android.os.CancellationSignal();request=signal;
+        android.content.Context context=getContext().getApplicationContext();
+        images.execute(()->{
+            PhotoImage result=null;
+            try{result=PhotoImage.read(context,android.net.Uri.parse(key),signal,2048,4000000);}
+            catch(Exception|OutOfMemoryError ignored){}
+            PhotoImage decoded=result;
+            post(()->{
+                if(closed||signal.isCanceled()){if(decoded!=null)decoded.bitmap.recycle();return;}
+                if(decoded==null)rendered="";
+                photo=decoded==null?null:decoded.bitmap;
+                photoWidth=decoded==null?0:decoded.width;photoHeight=decoded==null?0:decoded.height;
+                softened=null;appearanceChanged();
+            });
+        });
+    }
     private void drawPhoto(Canvas canvas,float width,float height){canvas.drawColor(background);paint.setShader(null);paint.setColorFilter(null);paint.setAlpha(255);paint.setFilterBitmap(true);float scale=position.equals("Fit")?Math.min(width/photo.getWidth(),height/photo.getHeight()):Math.max(width/photo.getWidth(),height/photo.getHeight());float w=photo.getWidth()*scale,h=photo.getHeight()*scale;
         if(position.equals("Stretch")){w=width;h=height;}
         if(position.equals("Center")||position.equals("Tile")){float displayScale=following?1:width/Math.max(1,getResources().getDisplayMetrics().widthPixels);w=Math.max(1,photoWidth)*displayScale;h=Math.max(1,photoHeight)*displayScale;}
         if(position.equals("Tile")){BitmapShader shader=new BitmapShader(photo,Shader.TileMode.REPEAT,Shader.TileMode.REPEAT);Matrix matrix=new Matrix();matrix.setScale(w/photo.getWidth(),h/photo.getHeight());shader.setLocalMatrix(matrix);paint.setShader(shader);canvas.drawRect(0,0,width,height,paint);paint.setShader(null);}else canvas.drawBitmap(photo,null,new RectF((width-w)/2,(height-h)/2,(width+w)/2,(height+h)/2),paint);
     }
-    void close(){closed=true;if(request!=null)request.cancel();photo=null;softened=null;}
+    void close(){closed=true;pauseSlides();if(request!=null)request.cancel();photo=null;softened=null;}
     private void drawSeven(Canvas canvas, float width, float height) {
         if (width <= 0 || height <= 0) return;
         paint.setStyle(Paint.Style.FILL);
