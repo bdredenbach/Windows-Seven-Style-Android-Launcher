@@ -12,9 +12,33 @@ import java.util.*;
 final class WindowPreviews {
     interface Host {java.util.List<DesktopWindow> windows();java.util.List<String> external();String label(String id);void open(String id);View wallpaper();void showDesktop();void preparePreview();}
     private final Activity activity;private final Host host;private final Handler main=new Handler(Looper.getMainLooper());
-    private Dialog dialog;private PopupWindow folderPicker;private Runnable pending;
+    private Dialog dialog;private PopupWindow folderPicker;private Runnable pending,peekPending;
+    private final List<DesktopWindow> ghosted=new ArrayList<>();
     private final Runnable dismissFolderHover=()->{if(folderPicker!=null&&!folderPicker.isFocusable())folderPicker.dismiss();};
     WindowPreviews(Activity activity,Host host){this.activity=activity;this.host=host;}
+    void bindDesktopPeek(View button){
+        button.setOnHoverListener((v,event)->{
+            if(event.getActionMasked()==MotionEvent.ACTION_HOVER_ENTER)queuePeek(null);
+            if(event.getActionMasked()==MotionEvent.ACTION_HOVER_EXIT)clearPeek();
+            return false;
+        });
+    }
+    private void queuePeek(DesktopWindow selected){
+        clearPeek();
+        peekPending=()->{
+            if(!activity.hasWindowFocus()&&(folderPicker==null||!folderPicker.isShowing()))return;
+            for(DesktopWindow window:host.windows()){
+                if(window==selected||!window.isShown()||window.minimizing()||window.getAlpha()!=1f)continue;
+                window.setAlpha(.08f);ghosted.add(window);
+            }
+        };
+        main.postDelayed(peekPending,300);
+    }
+    private void clearPeek(){
+        if(peekPending!=null){main.removeCallbacks(peekPending);peekPending=null;}
+        for(DesktopWindow window:ghosted)if(window.getAlpha()==.08f)window.setAlpha(1f);
+        ghosted.clear();
+    }
     static boolean allowed(DesktopWindow window){return !(window.body instanceof BrowserPanel)||!((BrowserPanel)window.body).hasPrivateTabs();}
     private Bitmap snapshot(DesktopWindow window){
         return allowed(window)?capture(window,280,170):null;
@@ -149,8 +173,14 @@ final class WindowPreviews {
             card.setOnClickListener(v->{dismiss();target.open.run();});
             card.setOnHoverListener((v,event)->{
                 boolean over=event.getActionMasked()!=MotionEvent.ACTION_HOVER_EXIT;
-                if(over)main.removeCallbacks(dismissFolderHover);
-                else if(!sticky)main.postDelayed(dismissFolderHover,300);
+                if(over){
+                    main.removeCallbacks(dismissFolderHover);
+                    if(event.getActionMasked()==MotionEvent.ACTION_HOVER_ENTER&&target.source instanceof DesktopWindow&&target.source.isShown())
+                        queuePeek((DesktopWindow)target.source);
+                }else{
+                    clearPeek();
+                    if(!sticky)main.postDelayed(dismissFolderHover,300);
+                }
                 card.setBackground(over?Aero.panel(context,0xfff3fbff,0xffa7d3f3,3,0xfff7fbff)
                         :Aero.panel(context,0xffedf7ff,0xffc7dfee,3,0xff7199b6));
                 return false;
@@ -181,7 +211,7 @@ final class WindowPreviews {
             }
             if(!images.isEmpty())main.postDelayed(this,500);
         }};
-        picker.setOnDismissListener(()->{main.removeCallbacks(refresh);main.removeCallbacks(dismissFolderHover);if(folderPicker==picker)folderPicker=null;});
+        picker.setOnDismissListener(()->{clearPeek();main.removeCallbacks(refresh);main.removeCallbacks(dismissFolderHover);if(folderPicker==picker)folderPicker=null;});
         int[] position=new int[2];anchor.getLocationOnScreen(position);
         int x=Math.max(safe.left+gap,Math.min(position[0]+(anchor.getWidth()-width)/2,safe.right-width-gap));
         picker.showAtLocation(anchor.getRootView(),Gravity.TOP|Gravity.LEFT,x,Math.max(safe.top,position[1]-height-gap/2));
@@ -205,9 +235,8 @@ final class WindowPreviews {
         view.setOnDismissListener(d->{if(dialog==view)dialog=null;});
         view.setOnKeyListener((d,key,event)->{
             if(event.getAction()!=KeyEvent.ACTION_DOWN)return false;
-            if(key==KeyEvent.KEYCODE_TAB&&event.isMetaPressed()){
-                stack.step(event.isShiftPressed()?-1:1);
-                return true;
+            if(key==KeyEvent.KEYCODE_TAB||key==KeyEvent.KEYCODE_DPAD_LEFT||key==KeyEvent.KEYCODE_DPAD_RIGHT){
+                stack.step(key==KeyEvent.KEYCODE_DPAD_LEFT||event.isShiftPressed()?-1:1);return true;
             }
             if(key==KeyEvent.KEYCODE_ESCAPE){dismiss();return true;}
             return false;
@@ -237,5 +266,5 @@ final class WindowPreviews {
         int height=Math.round(activity.getResources().getDisplayMetrics().heightPixels*.75f);dialog.getWindow().setLayout(Math.min(Aero.dp(activity,400),activity.getResources().getDisplayMetrics().widthPixels-Aero.dp(activity,24)),height);
     }
     private void hideHover(){if(pending!=null)main.removeCallbacks(pending);pending=null;main.removeCallbacks(dismissFolderHover);}
-    boolean dismiss(){boolean was=dialog!=null||folderPicker!=null;hideHover();if(folderPicker!=null)folderPicker.dismiss();if(dialog!=null){Dialog old=dialog;dialog=null;old.dismiss();}return was;}
+    boolean dismiss(){boolean was=dialog!=null||folderPicker!=null;clearPeek();hideHover();if(folderPicker!=null)folderPicker.dismiss();if(dialog!=null){Dialog old=dialog;dialog=null;old.dismiss();}return was;}
 }

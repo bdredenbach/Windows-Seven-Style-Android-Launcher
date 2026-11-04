@@ -2,7 +2,7 @@
 
 Nth Desktop Seven is a Windows 7–inspired Android home launcher. Its first test build, **0.1.0**, adds Aero Snap and installs alongside Nth Desktop Vista under the separate app ID `com.nthexperience.desktop.seven`.
 
-**0.4.0** opens taskbar previews on a hold and keeps Explorer and shortcut folders in the same taskbar family. Flip 3D works with a desktop-only stack and is searchable from Start. Double-click a gadget to add it to the right edge. Personalization adds seven original backgrounds, new themes, and a checked picture gallery with folder browsing, timed rotation and shuffle.
+**0.4.0** opens taskbar previews on a hold, adds mouse Aero Peek, and keeps Explorer and shortcut folders in the same taskbar family. Flip 3D works with a desktop-only stack and is searchable from Start. Double-click a gadget to add it to the right edge. Personalization adds seven original backgrounds, new themes, and a checked picture gallery with folder browsing, timed rotation and shuffle.
 
 **0.3.0** groups Explorer windows into one stacked taskbar button by default. Hold it to see updating thumbnails and choose a window. Start has a raised profile picture, and the taskbar shows the time above the date. Personalization offers theme previews and the desktop context menu changes the wallpaper. Gadgets can be placed or resized directly on the desktop.
 
