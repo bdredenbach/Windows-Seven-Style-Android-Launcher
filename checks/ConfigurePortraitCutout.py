@@ -14,8 +14,8 @@ adb('cmd', 'overlay', 'enable-exclusive', '--user', '0', '--category', overlay)
 # WindowManager cutout cache when a live application was created without it.
 adb('settings', 'put', 'system', 'accelerometer_rotation', '0')
 adb('settings', 'put', 'system', 'user_rotation', '0')
-adb('am', 'force-stop', 'com.nthexperience.desktop')
-adb('am', 'start', '-W', '-n', 'com.nthexperience.desktop/.MainActivity')
+adb('am', 'force-stop', 'com.nthexperience.desktop.seven')
+adb('am', 'start', '-W', '-n', 'com.nthexperience.desktop.seven/com.nthexperience.desktop.MainActivity')
 deadline = time.monotonic() + 15
 while time.monotonic() < deadline:
     state = adb('dumpsys', 'display')
@@ -30,4 +30,4 @@ else:
     print(adb('dumpsys', 'window', 'displays'))
     print(state)
     raise AssertionError('WindowManager has not activated the portrait cutout')
-adb('am', 'force-stop', 'com.nthexperience.desktop')
+adb('am', 'force-stop', 'com.nthexperience.desktop.seven')

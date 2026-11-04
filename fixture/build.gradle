@@ -2,6 +2,16 @@ plugins { id 'com.android.application' }
 android {
     namespace 'com.nthexperience.desktop.fixture'
     compileSdk 36
-    defaultConfig { applicationId 'com.nthexperience.desktop.fixture'; minSdk 26; targetSdk 36; versionCode 1; versionName '1' }
+    buildFeatures { buildConfig = true }
+    defaultConfig {
+        applicationId 'com.nthexperience.desktop.fixture'
+        minSdk 26
+        targetSdk 36
+        versionCode 1
+        versionName '1'
+        def launcherId = rootProject.ext.launcherApplicationId
+        manifestPlaceholders.launcherApplicationId = launcherId
+        buildConfigField 'String', 'LAUNCHER_APPLICATION_ID', '"' + launcherId + '"'
+    }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }

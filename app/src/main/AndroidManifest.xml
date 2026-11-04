@@ -27,15 +27,15 @@
         android:allowBackup="false"
         android:usesCleartextTraffic="true"
         android:requestLegacyExternalStorage="true"
-        android:label="Nth Desktop Vista"
+        android:label="@string/app_name"
         android:icon="@drawable/ic_launcher"
         android:theme="@style/AppTheme"
         android:supportsRtl="true">
-        <provider android:name=".DeviceDocumentsProvider" android:authorities="com.nthexperience.desktop.storage" android:exported="true" android:grantUriPermissions="true" android:permission="android.permission.MANAGE_DOCUMENTS" />
+        <provider android:name=".DeviceDocumentsProvider" android:authorities="${applicationId}.storage" android:exported="true" android:grantUriPermissions="true" android:permission="android.permission.MANAGE_DOCUMENTS" />
         <activity android:name=".ExplorerPickerActivity" android:exported="true" android:label="Nth Explorer" android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.GET_CONTENT" />
-                <action android:name="com.nthexperience.desktop.action.PICK_FILE" />
+                <action android:name="${applicationId}.action.PICK_FILE" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.OPENABLE" />
                 <data android:mimeType="*/*" />

@@ -1,4 +1,15 @@
-# Nth Desktop Vista for Android
+# Nth Desktop Seven for Android
+
+Nth Desktop Seven is a Windows 7–inspired Android home launcher. Its first test build, **0.1.0**, adds Aero Snap and installs alongside Nth Desktop Vista under the separate app ID `com.nthexperience.desktop.seven`.
+
+- Drag an Nth window by its title bar to the top to maximize it, or to the left or right to fill that half of the usable desktop.
+- The blue outline shows where the window will land. Drag a snapped window away by its title bar to restore its previous floating size.
+- Side snap requires 240 dp of width per window and 190 dp of usable height. The work area accounts for the taskbar, system insets and any space reserved for an always-on-top Sidebar.
+- Android grants Seven its own file access. Desktop settings, media libraries and Recycle Bin entries belong to each app's install.
+
+Seven starts from [Vista 0.24.0 at commit `7c3fd10`](https://github.com/bdredenbach/Windows-Vista-Style-Android-Launcher/commit/7c3fd109ac1fae51486c8f645b5f7cba7370bdeb). Use `./gradlew :app:assembleDebug` to build it. Android 11 and Android 16 emulator checks cover the inherited tools, side-by-side installation and title-bar gestures.
+
+## Inherited Vista features and history
 
 A Vista-style Android home launcher by Nth Experience. **0.22.0 — Vista finishing touches** adds glass-aware active task buttons, folder-window grouping, a notification-area chevron with original Vista-inspired device icons, matching thin Quick Launch separators, an Explorer-style Recycle Bin, a thumbnail background picker, independent Explorer windows, verified file drag/drop, real-folder desktop shortcuts and a framed Gadget Gallery with Sidebar close/options/move tools (hover or hold the options button to reveal the full strip).
 

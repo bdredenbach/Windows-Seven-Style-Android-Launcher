@@ -2,6 +2,7 @@ package com.nthexperience.desktop;
 
 /** Window rectangles in the actual work area, independent of Android/density. */
 final class WindowArrangement {
+    static final int MIN_SIDE_WIDTH_DP=240, MIN_STACK_HEIGHT_DP=190;
     static int[][] rectangles(String mode,int count,int width,int height,int minWidth,int minHeight,int step){
         int n=Math.max(0,count),w=Math.max(1,width),h=Math.max(1,height);
         int[][] result=new int[n][4];

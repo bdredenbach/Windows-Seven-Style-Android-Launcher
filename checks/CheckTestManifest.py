@@ -3,7 +3,7 @@ from pathlib import Path
 import struct
 import zipfile
 
-required = {'FidelitySmoke', 'StorageSmoke', 'BrowserSmoke', 'PhotoSmoke', 'ContinuitySmoke', 'AuthenticitySmoke', 'FileOpenSmoke', 'PolishSmoke', 'DesktopExtrasSmoke', 'MediaSmoke'}
+required = {'FidelitySmoke', 'StorageSmoke', 'BrowserSmoke', 'PhotoSmoke', 'ContinuitySmoke', 'AuthenticitySmoke', 'FileOpenSmoke', 'PolishSmoke', 'DesktopExtrasSmoke', 'MediaSmoke', 'SnapSmoke'}
 apk = Path('app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk')
 with zipfile.ZipFile(apk) as archive:
     data = archive.read('AndroidManifest.xml')
@@ -37,12 +37,15 @@ while offset < len(data):
         tag = strings[struct.unpack_from('<I', data, offset + 20)[0]]
         if tag == 'instrumentation':
             start, step, count = struct.unpack_from('<HHH', data, offset + 24)
+            attributes = {}
             for i in range(count):
                 at = offset + 16 + start + i * step
                 namespace, key, raw = struct.unpack_from('<III', data, at)
                 value = struct.unpack_from('<I', data, at + 16)[0]
-                if strings[key] == 'name':
-                    suites.add(strings[raw if raw != 0xffffffff else value].rsplit('.', 1)[-1])
+                if strings[key] in ('name', 'targetPackage'):
+                    attributes[strings[key]] = strings[raw if raw != 0xffffffff else value]
+            assert attributes.get('targetPackage') == 'com.nthexperience.desktop.seven', attributes
+            suites.add(attributes['name'].rsplit('.', 1)[-1])
     offset += size
 assert required <= suites, 'Test APK is missing instrumentation: ' + ', '.join(sorted(required - suites))
 print('PASS: all required native suites are registered in the packaged test APK')

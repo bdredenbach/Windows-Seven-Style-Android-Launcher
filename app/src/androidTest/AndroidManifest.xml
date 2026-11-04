@@ -13,14 +13,15 @@
         <activity android:name="com.nthexperience.desktop.TestAwayActivity" android:exported="true" android:theme="@android:style/Theme.Material.Light.NoActionBar" />
         <activity android:name="com.nthexperience.desktop.PickerCallerActivity" android:exported="true" android:theme="@android:style/Theme.Material.Light.NoActionBar" />
     </application>
-    <instrumentation android:name="com.nthexperience.desktop.StorageSmoke" android:targetPackage="com.nthexperience.desktop" android:functionalTest="true" />
-    <instrumentation android:name="com.nthexperience.desktop.ContinuitySmoke" android:targetPackage="com.nthexperience.desktop" android:functionalTest="true" />
-    <instrumentation android:name="com.nthexperience.desktop.PhotoSmoke" android:targetPackage="com.nthexperience.desktop" android:functionalTest="true" />
-    <instrumentation android:name="com.nthexperience.desktop.BrowserSmoke" android:targetPackage="com.nthexperience.desktop" android:functionalTest="true" />
-    <instrumentation android:name="com.nthexperience.desktop.FileOpenSmoke" android:targetPackage="com.nthexperience.desktop" android:functionalTest="true" />
-    <instrumentation android:name="com.nthexperience.desktop.AuthenticitySmoke" android:targetPackage="com.nthexperience.desktop" android:functionalTest="true" />
-    <instrumentation android:name="com.nthexperience.desktop.PolishSmoke" android:targetPackage="com.nthexperience.desktop" android:functionalTest="true" />
-    <instrumentation android:name="com.nthexperience.desktop.DesktopExtrasSmoke" android:targetPackage="com.nthexperience.desktop" android:functionalTest="true" />
-    <instrumentation android:name="com.nthexperience.desktop.FidelitySmoke" android:targetPackage="com.nthexperience.desktop" android:functionalTest="true" />
-    <instrumentation android:name="com.nthexperience.desktop.MediaSmoke" android:targetPackage="com.nthexperience.desktop" android:functionalTest="true" />
+    <instrumentation android:name="com.nthexperience.desktop.StorageSmoke" android:targetPackage="${launcherApplicationId}" android:functionalTest="true" />
+    <instrumentation android:name="com.nthexperience.desktop.ContinuitySmoke" android:targetPackage="${launcherApplicationId}" android:functionalTest="true" />
+    <instrumentation android:name="com.nthexperience.desktop.PhotoSmoke" android:targetPackage="${launcherApplicationId}" android:functionalTest="true" />
+    <instrumentation android:name="com.nthexperience.desktop.BrowserSmoke" android:targetPackage="${launcherApplicationId}" android:functionalTest="true" />
+    <instrumentation android:name="com.nthexperience.desktop.FileOpenSmoke" android:targetPackage="${launcherApplicationId}" android:functionalTest="true" />
+    <instrumentation android:name="com.nthexperience.desktop.AuthenticitySmoke" android:targetPackage="${launcherApplicationId}" android:functionalTest="true" />
+    <instrumentation android:name="com.nthexperience.desktop.PolishSmoke" android:targetPackage="${launcherApplicationId}" android:functionalTest="true" />
+    <instrumentation android:name="com.nthexperience.desktop.DesktopExtrasSmoke" android:targetPackage="${launcherApplicationId}" android:functionalTest="true" />
+    <instrumentation android:name="com.nthexperience.desktop.FidelitySmoke" android:targetPackage="${launcherApplicationId}" android:functionalTest="true" />
+    <instrumentation android:name="com.nthexperience.desktop.MediaSmoke" android:targetPackage="${launcherApplicationId}" android:functionalTest="true" />
+    <instrumentation android:name="com.nthexperience.desktop.SnapSmoke" android:targetPackage="${launcherApplicationId}" android:functionalTest="true" />
 </manifest>

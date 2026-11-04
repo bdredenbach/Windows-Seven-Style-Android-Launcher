@@ -2,12 +2,14 @@ plugins { id 'com.android.application' }
 android {
     namespace 'com.nthexperience.desktop'
     compileSdk 36
+    buildFeatures { buildConfig = true }
     defaultConfig {
-        applicationId 'com.nthexperience.desktop'
+        applicationId rootProject.ext.launcherApplicationId
+        manifestPlaceholders.launcherApplicationId = applicationId
         minSdk 26
         targetSdk 36
-        versionCode 34
-        versionName '0.24.0'
+        versionCode 1
+        versionName '0.1.0'
         testInstrumentationRunner 'com.nthexperience.desktop.StorageSmoke'
     }
     compileOptions {

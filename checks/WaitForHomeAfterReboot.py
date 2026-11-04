@@ -42,10 +42,10 @@ for attempt in range(45):
         recovered = True
         print("CHECK: retained Android system-ANR evidence and chose Wait before observing Home", flush=True)
     else:
-        xml = adb("exec-out", "run-as", "com.nthexperience.desktop", "cat", "shared_prefs/startup_session.xml")
+        xml = adb("exec-out", "run-as", "com.nthexperience.desktop.seven", "cat", "shared_prefs/startup_session.xml")
         pathlib.Path("reboot-first.xml").write_text(xml)
         claimed = ET.fromstring(xml).find("int[@name='boot']")
-        if "com.nthexperience.desktop/.MainActivity" in focus or "com.nthexperience.desktop/com.nthexperience.desktop.MainActivity" in focus:
+        if "com.nthexperience.desktop.seven/com.nthexperience.desktop.MainActivity" in focus:
             if claimed is not None and int(claimed.get("value")) == boot:
                 print("CHECK: Nth has real window focus and has claimed this Android boot", flush=True)
                 break

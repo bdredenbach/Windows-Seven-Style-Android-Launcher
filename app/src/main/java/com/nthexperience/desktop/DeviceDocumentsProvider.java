@@ -26,7 +26,7 @@ public final class DeviceDocumentsProvider extends DocumentsProvider {
     private void row(MatrixCursor cursor,String id,File file){MatrixCursor.RowBuilder row=cursor.newRow();for(String column:cursor.getColumnNames())switch(column){case "document_id":row.add(id);break;case "_display_name":row.add(id.equals("primary:")?"Internal storage":file.getName());break;case "mime_type":row.add(mime(file));break;case "_size":row.add(file.isDirectory()?null:file.length());break;case "last_modified":row.add(file.lastModified());break;case "flags":row.add(flags(id,file));break;default:row.add(null);}}
     @Override public Cursor queryRoots(String[] projection){return new MatrixCursor(projection==null?new String[]{"root_id","document_id","title","flags","mime_types"}:projection);}
     @Override public Cursor queryDocument(String documentId,String[] projection)throws FileNotFoundException{File file=existing(documentId);MatrixCursor cursor=new MatrixCursor(projection==null?COLUMNS:projection);row(cursor,documentId,file);return cursor;}
-    static final String INCOMPLETE_CHILDREN = "com.nthexperience.desktop.INCOMPLETE_CHILDREN";
+    static final String INCOMPLETE_CHILDREN = BuildConfig.APPLICATION_ID+".INCOMPLETE_CHILDREN";
     @Override public Cursor queryChildDocuments(String parentId,String[] projection,String order)throws FileNotFoundException{
         owner();File parent=existing(parentId);
         if(!parent.isDirectory())throw missing("Not a folder");

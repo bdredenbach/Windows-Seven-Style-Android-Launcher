@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <queries><package android:name="com.nthexperience.desktop" /></queries>
+    <queries><package android:name="${launcherApplicationId}" /></queries>
     <application android:label="Nth isolated test files" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:allowBackup="false">
         <provider android:name=".FixtureProvider" android:authorities="com.nthexperience.desktop.fixture.documents" android:exported="true" android:grantUriPermissions="true" android:permission="android.permission.MANAGE_DOCUMENTS">
             <intent-filter><action android:name="android.content.action.DOCUMENTS_PROVIDER" /></intent-filter>
