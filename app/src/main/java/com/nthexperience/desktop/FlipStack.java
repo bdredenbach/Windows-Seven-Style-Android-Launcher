@@ -92,12 +92,6 @@ final class FlipStack extends FrameLayout {
         LayoutParams footer = new LayoutParams(dp(Math.max(200, panelWidth)), -2, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
         footer.bottomMargin = dp(10);
         addView(controls, footer);
-        stage.addOnLayoutChangeListener((view, l, t, r, b, ol, ot, or, ob) -> {
-            if (r-l != or-ol || b-t != ob-ot) {
-                clearCards();
-                positionCards(0);
-            }
-        });
         updateStatus();
     }
 
@@ -251,9 +245,26 @@ final class FlipStack extends FrameLayout {
 
     private final class Stage extends FrameLayout {
         private final int slop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
+        private final Runnable rebuildCards = () -> {
+            clearCards();
+            positionCards(progress);
+        };
         private float startX, startY;
         private boolean dragging;
         Stage() { super(FlipStack.this.getContext()); }
+
+        @Override protected void onSizeChanged(int width, int height, int oldWidth, int oldHeight) {
+            super.onSizeChanged(width, height, oldWidth, oldHeight);
+            removeCallbacks(rebuildCards);
+            // Add the cards after this traversal so their layout requests schedule a new pass.
+            if (width > 0 && height > 0) post(rebuildCards);
+        }
+
+        @Override protected void onDetachedFromWindow() {
+            removeCallbacks(rebuildCards);
+            super.onDetachedFromWindow();
+        }
+
         @Override public boolean onInterceptTouchEvent(MotionEvent event) {
             if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
                 finishAnimation();

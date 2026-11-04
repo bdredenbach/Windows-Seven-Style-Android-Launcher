@@ -30,11 +30,64 @@ public final class DesktopExtrasSmoke extends Instrumentation {
     }finally{try{if(home!=null)ui(()->home.onBackPressed());for(JSONObject item:binItems)try{RecycleBin.remove(getTargetContext(),item);}catch(Exception ignored){}if(folder!=null)delete(folder);if(store!=null){SharedPreferences.Editor e=store.prefs.edit().clear();for(Map.Entry<String,Object> entry:original.entrySet()){Object value=entry.getValue();if(value instanceof String)e.putString(entry.getKey(),(String)value);else if(value instanceof Boolean)e.putBoolean(entry.getKey(),(Boolean)value);else if(value instanceof Integer)e.putInt(entry.getKey(),(Integer)value);else if(value instanceof Long)e.putLong(entry.getKey(),(Long)value);else if(value instanceof Float)e.putFloat(entry.getKey(),(Float)value);}e.commit();}}catch(Exception ignored){}}
         finish(success?Activity.RESULT_OK:Activity.RESULT_CANCELED,result);
     }
+    private void flipFirstOpen() throws Exception {
+        String[] tools = {"@notes", "@calendar", "@sticky", "@computer", "@files"};
+        List<String> captions = new ArrayList<>();
+        String originalScale = Settings.Global.getString(home.getContentResolver(), Settings.Global.ANIMATOR_DURATION_SCALE);
+        try {
+            setAnimatorScale("1");
+            store.prefs.edit().putBoolean("reduce_motion", false).commit();
+            await(() -> Aero.motion(home), "Flip 3D runs with animations enabled");
+            for (int count = 0; count <= tools.length; count++) {
+                if (count > 0) {
+                    String tool = tools[count - 1];
+                    ui(() -> home.open(tool));
+                    await(() -> window(tool) != null, "Window opened: " + tool);
+                    captions.add(window(tool).caption());
+                }
+                progress("Flip 3D renders before input with " + count + " open windows");
+                ui(() -> home.open("@flip3d"));
+                for (String caption : captions) awaitFlipCard(caption);
+                // The desktop starts just beyond the five visible cards in a six-card deck.
+                if (count == tools.length) nodeTap("Next window");
+                awaitFlipCard("Show Desktop");
+                nodeTap("Close Flip 3D");
+            }
+        } finally {
+            setAnimatorScale(originalScale);
+            store.prefs.edit().putBoolean("reduce_motion", true).commit();
+            ui(() -> {
+                for (String tool : tools) {
+                    DesktopWindow opened = window(tool);
+                    if (opened != null) opened.closeWindow();
+                }
+            });
+        }
+    }
+    private void setAnimatorScale(String scale) throws IOException {
+        String setting = "global " + Settings.Global.ANIMATOR_DURATION_SCALE;
+        String command = scale == null ? "settings delete " + setting : "settings put " + setting + " " + Float.parseFloat(scale);
+        try (InputStream in = new ParcelFileDescriptor.AutoCloseInputStream(getUiAutomation().executeShellCommand(command))) {
+            read(in);
+        }
+    }
+    private void awaitFlipCard(String caption) throws Exception {
+        long end = SystemClock.uptimeMillis() + 4000;
+        Rect bounds = new Rect();
+        while (SystemClock.uptimeMillis() < end) {
+            AccessibilityNodeInfo card = node("Flip to " + caption);
+            if (card != null && card.isVisibleToUser()) {
+                card.getBoundsInScreen(bounds);
+                if (bounds.width() >= Aero.dp(home, 24) && bounds.height() >= Aero.dp(home, 24)) return;
+            }
+            Thread.sleep(80);
+        }
+        throw new AssertionError("Flip 3D card has no visible bounds: " + caption);
+    }
     private void previews()throws Exception{
-        progress("Flip 3D starts with a desktop card even when no windows are open");
-        ui(()->home.open("@flip3d"));awaitNode("Flip to Show Desktop");nodeTap("Close Flip 3D");
+        flipFirstOpen();
         ui(()->home.open("@notes"));DesktopWindow notes=window("@notes");
-        ui(()->home.open("@flip3d"));awaitNode("Flip to Notepad");awaitNode("Flip to Show Desktop");
+        ui(()->home.open("@flip3d"));awaitFlipCard("Notepad");awaitFlipCard("Show Desktop");
         nodeTap("Next window");awaitNode("Selected window: Show Desktop");
         nodeTap("Previous window");awaitNode("Selected window: Notepad");nodeTap("Switch to window");
         progress("native window overview and pointer preview");EditText edit=(EditText)find(notes,v->"Notepad text".equals(v.getContentDescription()));ui(()->edit.setText("Extras keeps this note"));ui(()->home.open("@calendar"));DesktopWindow calendar=window("@calendar");ui(calendar::minimize);
