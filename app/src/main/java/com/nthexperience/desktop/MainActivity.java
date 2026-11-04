@@ -112,7 +112,7 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
         // Keep the icon sheet in one cached layer when side insets move during a 180-degree turn.
         desktop=new DesktopIconGrid(this,store,layoutKey);scroll.addView(desktop,new ScrollView.LayoutParams(-1,-2));workspace.addView(scroll,new FrameLayout.LayoutParams(-1,-1));
         desktop.setOnDragListener((v,event)->{if(event.getLocalState() instanceof FileDrag){FileDrag drag=(FileDrag)event.getLocalState();if(store.prefs.getBoolean("layout_locked",false)||drag.refs.stream().anyMatch(r->!r.item.directory()))return false;if(event.getAction()==DragEvent.ACTION_DROP){try{for(DocumentOps.Ref ref:drag.refs)FolderLinks.add(store,DocumentFolders.childPage(drag.sourcePage,ref.item),ref.item.name);desktopChanged();toast("Folder shortcut added; original folder kept in place.");}catch(JSONException ex){toast(ex.getMessage());}}return true;}if(!(event.getLocalState() instanceof String)||((String)event.getLocalState()).startsWith("gadget:")||store.prefs.getBoolean("layout_locked",false))return false;if(event.getAction()==DragEvent.ACTION_DROP){desktop.place((String)event.getLocalState(),event.getX()-desktop.cellWidth()/2f,event.getY()-desktop.cellHeight()/2f);return true;}return true;});
-        sidebar=new GadgetSidebar(this,store,wallpaper,this,workspace,layoutKey);FrameLayout.LayoutParams sideParams=new FrameLayout.LayoutParams(dp(140),-1,Gravity.END);workspace.addView(sidebar,sideParams);workspace.addView(sidebar.floatingHost,new FrameLayout.LayoutParams(-1,-1));
+        sidebar=new GadgetSidebar(this,store,this,workspace,layoutKey);workspace.addView(sidebar,new FrameLayout.LayoutParams(-1,-1));
         GestureDetector gestures=new GestureDetector(this,new GestureDetector.SimpleOnGestureListener(){
             public boolean onDown(MotionEvent e){return true;}
             public boolean onFling(MotionEvent a,MotionEvent b,float vx,float vy){if(a!=null&&a.getY()-b.getY()>dp(80)&&Math.abs(vy)>300){showStart(true);return true;}return false;}
@@ -130,24 +130,18 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
     }
     private void layoutWorkspace(){
         if(destroyed||workspace==null||workspace.getWidth()==0)return;int width=workspace.getWidth(),height=workspace.getHeight();if(tray!=null){tray.fitWidth(width);tray.bounds(desktopCutoutLeft,desktopCutoutRight,windowTopInset);}
-            int reserved=sidebar.getVisibility()==View.VISIBLE?dp(144):0;
-            FrameLayout.LayoutParams desktopParams=(FrameLayout.LayoutParams)desktopScroll.getLayoutParams();
-            if(desktopParams.rightMargin!=reserved||desktopParams.leftMargin!=0){desktopParams.rightMargin=reserved;desktopParams.leftMargin=0;desktopScroll.setLayoutParams(desktopParams);}
             WindowInsets current=root.getRootWindowInsets();java.util.List<android.graphics.Rect> holes=new ArrayList<>();
             if(current!=null&&Build.VERSION.SDK_INT>=28&&current.getDisplayCutout()!=null)holes.addAll(current.getDisplayCutout().getBoundingRects());
             desktop.configure(dp(store.tileWidth()),dp(store.tileHeight()),holes);desktop.viewport(Math.max(1,height-desktopScroll.getPaddingTop()-desktopScroll.getPaddingBottom()));
-            int sidebarTop=0;int[] screen=new int[2];workspace.getLocationOnScreen(screen);int sideLeft=screen[0]+width-dp(140),sideRight=screen[0]+width;
-            for(android.graphics.Rect hole:holes)if(hole.right>sideLeft&&hole.left<sideRight&&hole.bottom>screen[1]&&hole.top<screen[1]+windowTopInset)sidebarTop=Math.max(sidebarTop,Math.min(windowTopInset,hole.bottom-screen[1]+dp(2)));
-            FrameLayout.LayoutParams sideParams=(FrameLayout.LayoutParams)sidebar.getLayoutParams();if(sideParams.topMargin!=sidebarTop){sideParams.topMargin=sidebarTop;sidebar.setLayoutParams(sideParams);}
-            FrameLayout.LayoutParams floatingParams=(FrameLayout.LayoutParams)sidebar.floatingHost.getLayoutParams();if(floatingParams.topMargin!=windowTopInset){floatingParams.topMargin=windowTopInset;sidebar.floatingHost.setLayoutParams(floatingParams);}
-            sidebar.workspaceSize(width,Math.max(1,height-windowTopInset),Math.max(1,height-sidebarTop),windowTopInset);
-            for(DesktopWindow tool:windows.values()){tool.safeTop(windowTopInset);tool.safeRight(sidebarInset());}
+            FrameLayout.LayoutParams gadgetParams=(FrameLayout.LayoutParams)sidebar.getLayoutParams();
+            if(gadgetParams.topMargin!=windowTopInset){gadgetParams.topMargin=windowTopInset;sidebar.setLayoutParams(gadgetParams);}
+            sidebar.workspaceSize(width,Math.max(1,height-windowTopInset),windowTopInset);
+            for(DesktopWindow tool:windows.values())tool.safeTop(windowTopInset);
             if (startMenu != null) {
                 boolean portrait = getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT;
                 int available = Math.max(1, height - windowTopInset - dp(8));
                 int menuHeight = Math.min(dp(portrait ? 680 : 540), available);
                 int menuWidth = Math.min(dp(420), Math.max(1, width - dp(12)));
-                startMenu.availableHeight(menuHeight);
                 FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) startMenu.getLayoutParams();
                 if (params.height != menuHeight || params.width != menuWidth) {
                     params.height = menuHeight;
@@ -164,8 +158,8 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
         HorizontalScrollView strip=new HorizontalScrollView(this);taskStrip=strip;strip.setTag("taskbar-items");strip.setHorizontalScrollBarEnabled(false);strip.setFillViewport(true);strip.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(r-l>0&&taskViewportWidth!=r-l){taskViewportWidth=r-l;main.removeCallbacks(taskbarRender);main.post(taskbarRender);}});taskItems=new LinearLayout(this);taskItems.setGravity(Gravity.CENTER_VERTICAL);strip.addView(taskItems,new HorizontalScrollView.LayoutParams(-2,-1));taskItems.getViewTreeObserver().addOnGlobalLayoutListener(()->{int max=Math.max(0,taskItems.getWidth()-strip.getWidth());if(strip.getScrollX()>max)strip.scrollTo(max,0);});FrameLayout taskClip=new FrameLayout(this);taskClip.setClipChildren(true);taskClip.addView(strip,new FrameLayout.LayoutParams(-1,-1));taskbar.addView(taskClip,new LinearLayout.LayoutParams(0,dp(48),1));
         for(View surface:new View[]{taskbar,taskClip,strip,taskItems})ContextMenus.bind(surface,(x,y)->taskbarMenu(surface,x,y));
         tray=new SystemTray(this,workspace,wallpaper,new SystemTray.Host(){public void action(String id){vistaAction(id);}public void open(String id){MainActivity.this.open(id);}public void layout(){main.post(()->{layoutWorkspace();renderTaskbar();});}public void opening(){if(previews!=null)previews.dismiss();startMenu.hide();((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(root.getWindowToken(),0);}});taskbar.addView(tray,new LinearLayout.LayoutParams(-2,dp(48)));
-        clock=Aero.text(this,"",10,Color.WHITE);clock.setGravity(Gravity.CENTER);clock.setPadding(dp(5),0,dp(5),0);clock.setMinWidth(dp(55));clock.setOnClickListener(v->tray.show("calendar"));clock.setContentDescription("Clock and calendar");taskbar.addView(clock,new LinearLayout.LayoutParams(-2,dp(44)));
-        TextView peek=Aero.text(this,"",10,Color.WHITE);desktopToggle=peek;peek.setBackground(Aero.gloss(this,new int[]{0x668eaec0,0x554c697f,0x66314353},0,0x667f98ab));peek.setContentDescription("Show desktop");peek.setOnClickListener(v->showDesktop());ContextMenus.bind(peek,(x,y)->taskbarMenu(peek,x,y));taskbar.addView(peek,new LinearLayout.LayoutParams(dp(12),dp(44)));shell.addView(taskbar,new LinearLayout.LayoutParams(-1,dp(50)));renderTaskbar();
+        clock=Aero.text(this,"",10,Color.WHITE);clock.setGravity(Gravity.CENTER);clock.setMaxLines(2);clock.setIncludeFontPadding(false);clock.setPadding(dp(5),0,dp(5),0);clock.setMinWidth(dp(55));clock.setOnClickListener(v->tray.show("calendar"));clock.setContentDescription("Clock and calendar");taskbar.addView(clock,new LinearLayout.LayoutParams(-2,dp(44)));
+        TextView peek=Aero.text(this,"",10,Color.WHITE);desktopToggle=peek;peek.setBackground(Aero.gloss(this,new int[]{0x668eaec0,0x554c697f,0x66314353},0,0x667f98ab));peek.setContentDescription("Show desktop");peek.setOnClickListener(v->showDesktop());ContextMenus.bind(peek,(x,y)->taskbarMenu(peek,x,y));taskbar.addView(peek,new LinearLayout.LayoutParams(dp(12),dp(44)));shell.addView(taskbar,new LinearLayout.LayoutParams(-1,dp(54)));renderTaskbar();
     }
     private void scanApps(){
         if(destroyed)return;if(scanPending){scanAgain=true;return;}scanPending=true;int generation=++scanGeneration;
@@ -209,7 +203,7 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
     }
 
     private void renderTaskbar(){
-        if(taskItems==null)return;DesktopWindow weatherWindow=windows.get("@weather"),feedWindow=windows.get("@gadget:feeds"),networkWindow=windows.get("@gadget:network"),compassWindow=windows.get("@gadget:compass");if(sidebar!=null)sidebar.details(weatherWindow!=null&&weatherWindow.getParent()!=null&&weatherWindow.getVisibility()==View.VISIBLE,feedWindow!=null&&feedWindow.getParent()!=null&&feedWindow.getVisibility()==View.VISIBLE,networkWindow!=null&&networkWindow.getParent()!=null&&networkWindow.getVisibility()==View.VISIBLE,compassWindow!=null&&compassWindow.getParent()!=null&&compassWindow.getVisibility()==View.VISIBLE);DesktopWindow front=null;for(int i=workspace.getChildCount()-1;i>=0;i--){View child=workspace.getChildAt(i);if(child instanceof DesktopWindow&&child.getVisibility()==View.VISIBLE&&!((DesktopWindow)child).minimizing()){front=(DesktopWindow)child;break;}}for(DesktopWindow window:windows.values())if(window.getParent()!=null){window.safeRight(sidebarInset());window.active(window==front);}taskItems.removeAllViews();
+        if(taskItems==null)return;DesktopWindow weatherWindow=windows.get("@weather"),feedWindow=windows.get("@gadget:feeds"),networkWindow=windows.get("@gadget:network"),compassWindow=windows.get("@gadget:compass");if(sidebar!=null)sidebar.details(weatherWindow!=null&&weatherWindow.getParent()!=null&&weatherWindow.getVisibility()==View.VISIBLE,feedWindow!=null&&feedWindow.getParent()!=null&&feedWindow.getVisibility()==View.VISIBLE,networkWindow!=null&&networkWindow.getParent()!=null&&networkWindow.getVisibility()==View.VISIBLE,compassWindow!=null&&compassWindow.getParent()!=null&&compassWindow.getVisibility()==View.VISIBLE);DesktopWindow front=null;for(int i=workspace.getChildCount()-1;i>=0;i--){View child=workspace.getChildAt(i);if(child instanceof DesktopWindow&&child.getVisibility()==View.VISIBLE&&!((DesktopWindow)child).minimizing()){front=(DesktopWindow)child;break;}}for(DesktopWindow window:windows.values())if(window.getParent()!=null){window.active(window==front);}taskItems.removeAllViews();
         List<String> taskIds=new ArrayList<>();
         Set<String> explorerIds=new HashSet<>();
         for(Map.Entry<String,DesktopWindow> item:windows.entrySet())if(item.getValue().getParent()!=null){
@@ -231,16 +225,22 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
         int firstTask=taskItems.getChildCount();
         int occupied=external.size();
         for(String pin:pins)if(!taskIds.contains(pin)&&!external.contains(pin))occupied++;
-        for(List<String> group:TaskbarGrouping.groups(taskIds,explorerIds,store.prefs.getString("taskbar_grouping","When full"),taskRoom-occupied*(buttonWidth+gap),buttonWidth+gap)){
+        for(List<String> group:TaskbarGrouping.groups(taskIds,explorerIds,store.prefs.getString("taskbar_grouping",showLabels?"When full":"Always"),taskRoom-occupied*(buttonWidth+gap),buttonWidth+gap)){
             DesktopWindow first=windows.get(group.get(0));boolean grouped=group.size()>1,isActive=false;List<DesktopWindow> members=new ArrayList<>();for(String id:group){DesktopWindow window=windows.get(id);members.add(window);isActive|=window.active();if(window.active())first=window;}DesktopWindow target=first;
-            String title=grouped?"Folders ("+group.size()+")":target.caption();LinearLayout button=taskButton(target.toolId,title,showLabels);AeroGlass surface=new AeroGlass(wallpaper,AeroGlass.TASKBUTTON);surface.active(isActive);button.setBackground(surface);button.setSelected(isActive);button.setContentDescription(grouped?"Folder windows, "+group.size()+" windows":(isActive?"Minimize ":"Restore ")+title);
+            String title=grouped?"Folders ("+group.size()+")":target.caption();LinearLayout button=taskButton(grouped&&!showLabels?"@files":target.toolId,title,showLabels);AeroGlass surface=new AeroGlass(wallpaper,AeroGlass.TASKBUTTON);surface.active(isActive);surface.stacked(grouped&&!showLabels);button.setBackground(surface);button.setSelected(isActive);button.setContentDescription(grouped?"Folder windows, "+group.size()+" windows":(isActive?"Minimize ":"Restore ")+title);
             if(target.toolId.equals("@recycle"))button.setOnDragListener(this::recycleDrop);
-            if(grouped){if(!showLabels)button.setTooltipText(title);button.setOnClickListener(v->{startMenu.hide();tray.dismiss();previews.showGroup(members);});ContextMenus.bind(button,(x,y)->{DesktopContextMenu menu=new DesktopContextMenu(this,"Folder group commands");for(DesktopWindow window:members)menu.item(window.caption(),"files",window::restore);menu.separator();menu.item("Minimize group","empty",()->{for(DesktopWindow window:members)window.minimize();});menu.item("Close group","close",()->{for(DesktopWindow window:members)window.closeWindow();});ContextMenus.show(menu,button,x,y);});}
-            else{button.setTooltipText(title);if(previews!=null&&store.prefs.getBoolean("taskbar_previews",true)){button.setTooltipText(null);previews.bind(button,target);}button.setOnClickListener(v->{startMenu.hide();tray.dismiss();if(target.getVisibility()==View.VISIBLE&&!target.minimizing()&&target.active())target.minimize();else target.restore();});ContextMenus.bind(button,(x,y)->{startMenu.hide();tray.dismiss();target.showSystemMenu(button,x,y);});}
+            if(grouped){if(!showLabels)button.setTooltipText(title);button.setOnClickListener(v->{startMenu.hide();tray.dismiss();previews.folders(button,members,true);});ContextMenus.bind(button,(x,y)->{DesktopContextMenu menu=new DesktopContextMenu(this,"Folder group commands");menu.item("Open new Explorer window","files",()->newExplorer("libraries"));menu.separator();for(DesktopWindow window:members)menu.item(window.caption(),"files",window::restore);menu.separator();menu.item("Minimize group","empty",()->{for(DesktopWindow window:members)window.minimize();});menu.item("Close group","close",()->{for(DesktopWindow window:members)window.closeWindow();});ContextMenus.show(menu,button,x,y);});}
+            else{button.setTooltipText(title);if(!explorerIds.contains(target.toolId)&&store.prefs.getBoolean("taskbar_previews",true)){button.setTooltipText(null);previews.bind(button,target);}button.setOnClickListener(v->{startMenu.hide();tray.dismiss();if(target.getVisibility()==View.VISIBLE&&!target.minimizing()&&target.active())target.minimize();else target.restore();});ContextMenus.bind(button,(x,y)->{startMenu.hide();tray.dismiss();target.showSystemMenu(button,x,y);});}
+            if(explorerIds.contains(target.toolId)){
+                button.setTooltipText(null);
+                button.setOnLongClickListener(v->{startMenu.hide();tray.dismiss();previews.folders(button,members,true);return true;});
+                if(store.prefs.getBoolean("taskbar_previews",true))previews.bindFolders(button,members);
+            }
             LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(showLabels&&grouped?dp(112):buttonWidth,dp(48));
             size.rightMargin=gap;
             button.setLayoutParams(size);
-            String slot=group.contains("@files")||grouped&&!showLabels&&pins.contains("@files")?"@files":target.toolId;
+            boolean pinnedExplorerFamily=!showLabels&&explorerIds.contains(target.toolId)&&explorerIds.size()==group.size()&&pins.contains("@files");
+            String slot=group.contains("@files")||pinnedExplorerFamily?"@files":target.toolId;
             buttons.put(slot,button);
         }
         for(String id:external){
@@ -336,7 +336,6 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
             }
         }
     }
-    private int sidebarInset(){return sidebar!=null&&sidebar.getVisibility()==View.VISIBLE&&store.prefs.getBoolean("sidebar_always_top",false)?sidebar.getWidth():0;}
     private LinearLayout taskButton(String id,String title,boolean showLabel){
         LinearLayout button=new LinearLayout(this);
         button.setGravity(showLabel?Gravity.CENTER_VERTICAL:Gravity.CENTER);
@@ -448,12 +447,52 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
     }
     private RecyclePanel recycleWindow(){open("@recycle");return (RecyclePanel)windows.get("@recycle").body;}
     private void desktopOptions(float x,float y){
-        if(desktopMenu!=null)desktopMenu.dismiss();startMenu.hide();desktopMenu=new DesktopContextMenu(this);
-        desktopMenu.item("View  ›","appearance",()->desktopViewMenu(x,y));desktopMenu.item("Sort by  ›","programs",()->desktopSortMenu(x,y));desktopMenu.item("New folder","folderapps",()->organizer("@organize","new"));desktopMenu.item("Paste","paste",!ExplorerClipboard.shortcuts.isEmpty(),()->{try{ExplorerClipboard.paste(store,"desktop");desktopChanged();}catch(IllegalArgumentException ex){toast(ex.getMessage());}});desktopMenu.separator();
-        desktopMenu.item("All programs","programs",()->showStart(false));desktopMenu.item("Refresh","refresh",()->{scanApps();sidebar.refresh();});desktopMenu.separator();
-        desktopMenu.item("Computer","computer",this::computer);desktopMenu.item("Control Panel","control",()->open("@control"));desktopMenu.item("Show Sidebar","gadgets",()->vistaAction("sidebar-show"));desktopMenu.separator();
-        desktopMenu.item("Recycle Bin","delete",()->open("@recycle"));desktopMenu.item("Saved Workspaces…","computer",this::showWorkspaces);desktopMenu.item("Manage desktop shortcuts","computer",this::manageShortcuts);desktopMenu.item("Personalize","appearance",this::appearance);
+        if(desktopMenu!=null)desktopMenu.dismiss();startMenu.hide();previews.dismiss();
+        desktopMenu=new DesktopContextMenu(this,"Desktop context menu");
+        desktopMenu.submenu("View","appearance",()->desktopViewMenu(x,y));
+        desktopMenu.submenu("Sort by","programs",()->desktopSortMenu(x,y));
+        desktopMenu.item("Refresh","refresh",()->{scanApps();sidebar.refresh();});
+        desktopMenu.separator();
+        desktopMenu.item("Paste","paste",!ExplorerClipboard.shortcuts.isEmpty(),()->{
+            try{ExplorerClipboard.paste(store,"desktop");desktopChanged();}
+            catch(IllegalArgumentException ex){toast(ex.getMessage());}
+        });
+        desktopMenu.item("New folder","folderapps",()->organizer("@organize","new"));
+        desktopMenu.submenu("Desktop tools","computer",()->desktopTools(x,y));
+        desktopMenu.separator();
+        desktopMenu.item("Screen resolution","computer",()->vistaAction("android:display"));
+        desktopMenu.item("Gadgets","gadgets",this::gadgetGallery);
+        desktopMenu.submenu("Desktop background","pictures",()->backgroundMenu(x,y));
+        desktopMenu.item("Personalize","appearance",this::appearance);
         if(!isHome()){desktopMenu.separator();desktopMenu.item("Make default home","orb",this::home);}
+        showDesktopMenu(x,y);
+    }
+    private void desktopTools(float x,float y){
+        desktopMenu=new DesktopContextMenu(this,"Desktop tools");
+        desktopMenu.item("All programs","programs",()->showStart(false));
+        desktopMenu.item("Computer","computer",this::computer);
+        desktopMenu.item("Control Panel","control",()->open("@control"));
+        desktopMenu.item("Recycle Bin","delete",()->open("@recycle"));
+        desktopMenu.item("Saved Workspaces…","computer",this::showWorkspaces);
+        desktopMenu.item("Manage desktop shortcuts","computer",this::manageShortcuts);
+        showDesktopMenu(x,y);
+    }
+    private void backgroundMenu(float x,float y){
+        desktopMenu=new DesktopContextMenu(this,"Desktop backgrounds");
+        boolean stock=store.prefs.getString("wallpaper_photo","").isEmpty();
+        int current=store.prefs.getInt("wallpaper",AeroWallpaper.SEVEN);
+        for(int i=0;i<BackgroundPicker.THEMES.length;i++){
+            int theme=i;
+            desktopMenu.checked(BackgroundPicker.THEMES[i],stock&&current==theme,()->{
+                store.prefs.edit().putInt("wallpaper",theme).remove("wallpaper_photo").apply();
+                vistaAction("wallpaper");
+            });
+        }
+        desktopMenu.separator();
+        desktopMenu.item("Choose a picture…","pictures",()->open("setting:page:background"));
+        showDesktopMenu(x,y);
+    }
+    private void showDesktopMenu(float x,float y){
         desktopMenu.show(root,x,y,shell.getPaddingLeft(),shell.getPaddingTop()+windowTopInset,shell.getPaddingRight(),shell.getPaddingBottom());
     }
     private void manageShortcuts(){organizer("@organize","desktop");}
@@ -464,10 +503,10 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
         refreshRecycleIcon();renderTaskbar();
     }
     private void quickOptions(View anchor,String id){ContextMenus.centered(anchor,(x,y)->shortcutMenu(anchor,id,"quick",x,y));}
-    private void desktopViewMenu(float x,float y){desktopMenu=new DesktopContextMenu(this);String[] names={"Small icons","Medium icons","Large icons"};for(int i=0;i<names.length;i++){final int value=i;desktopMenu.item((store.prefs.getInt("desktop_icon_size",1)==i?"✓  ":"")+names[i],"computer",()->{store.prefs.edit().putInt("desktop_icon_size",value).remove("desktop_icon_percent").apply();desktopChanged();});}desktopMenu.show(root,x,y,shell.getPaddingLeft(),shell.getPaddingTop()+windowTopInset,shell.getPaddingRight(),shell.getPaddingBottom());}
+    private void desktopViewMenu(float x,float y){desktopMenu=new DesktopContextMenu(this);String[] names={"Small icons","Medium icons","Large icons"};for(int i=0;i<names.length;i++){final int value=i;desktopMenu.item((store.prefs.getInt("desktop_icon_size",1)==i?"✓  ":"")+names[i],"computer",()->{store.prefs.edit().putInt("desktop_icon_size",value).remove("desktop_icon_percent").apply();desktopChanged();});}desktopMenu.separator();desktopMenu.checked("Show desktop gadgets",sidebar.getVisibility()==View.VISIBLE,()->sidebar.visible(sidebar.getVisibility()!=View.VISIBLE));showDesktopMenu(x,y);}
     private void desktopSortMenu(float x,float y){desktopMenu=new DesktopContextMenu(this);for(String mode:Arrays.asList("Name","Type"))desktopMenu.item(mode,"programs",()->{List<String> ids=store.desktop();java.text.Collator collator=java.text.Collator.getInstance();ids.sort((a,b)->{if(mode.equals("Type")&&store.isFolder(a)!=store.isFolder(b))return store.isFolder(a)?-1:1;return collator.compare(label(a),label(b));});store.desktop(ids);desktop.clearPositions();desktopChanged();});desktopMenu.show(root,x,y,shell.getPaddingLeft(),shell.getPaddingTop()+windowTopInset,shell.getPaddingRight(),shell.getPaddingBottom());}
     private void startOrbMenu(View anchor,float x,float y){if(desktopMenu!=null)desktopMenu.dismiss();startMenu.hide();if(tray!=null)tray.dismiss();desktopMenu=new DesktopContextMenu(this,"Start button context menu");desktopMenu.item("Open","orb",()->showStart(false));desktopMenu.item("Explore","files",()->open("@files"));desktopMenu.item("Search","search",()->showStart(true));desktopMenu.separator();desktopMenu.item("Properties","control",()->open("setting:page:taskbar"));ContextMenus.show(desktopMenu,anchor,x,y);}
-    private void showStart(boolean search){if(tray!=null)tray.dismiss();startMenu.show(search);}
+    private void showStart(boolean search){if(previews!=null)previews.dismiss();if(tray!=null)tray.dismiss();startMenu.show(search);}
     private void showDesktop(){
         if(tray!=null)tray.dismiss();((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(workspace.getWindowToken(),0);startMenu.hide();
         if(!desktopHidden.isEmpty()){for(Map.Entry<String,DesktopWindow> item:new ArrayList<>(desktopHidden.entrySet())){DesktopWindow window=item.getValue();if(windows.get(item.getKey())==window&&window.getParent()!=null)window.restore();}desktopHidden.clear();}
@@ -492,7 +531,7 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
     }
     private void arrangeWindows(String mode){
         List<DesktopWindow> visible=new ArrayList<>();for(DesktopWindow window:orderedWindows())if(window.getVisibility()==View.VISIBLE&&!window.minimizing())visible.add(window);if(visible.isEmpty())return;
-        desktopHidden.clear();arrangementUndo.clear();int width=Math.max(1,workspace.getWidth()-sidebarInset()),height=Math.max(1,workspace.getHeight()-windowTopInset);
+        desktopHidden.clear();arrangementUndo.clear();int width=Math.max(1,workspace.getWidth()),height=Math.max(1,workspace.getHeight()-windowTopInset);
         int[][] rects=WindowArrangement.rectangles(mode,visible.size(),width,height,dp(WindowArrangement.MIN_SIDE_WIDTH_DP),dp(WindowArrangement.MIN_STACK_HEIGHT_DP),dp(30));for(int i=0;i<visible.size();i++){DesktopWindow window=visible.get(i);arrangementUndo.put(window,window.geometry());int[] r=rects[i];window.arrange(r[0],r[1],r[2],r[3]);}renderTaskbar();
     }
     private void undoArrangement(){for(Map.Entry<DesktopWindow,JSONObject> item:arrangementUndo.entrySet())if(item.getKey().getParent()!=null){item.getKey().restoreGeometry(item.getValue());item.getKey().saveGeometry();}arrangementUndo.clear();renderTaskbar();}
@@ -523,7 +562,7 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
     }
     private void window(String id,String title,View body){
         DesktopWindow current=windows.get(id);if(current!=null&&current.getParent()!=null){if(body instanceof VistaShell)((VistaShell)body).close();current.restore();return;}
-        DesktopWindow next=new DesktopWindow(this,workspace,title,body,wallpaper,this::renderTaskbar,store,id,layoutKey);next.safeTop(windowTopInset);next.safeRight(sidebarInset());windows.put(id,next);
+        DesktopWindow next=new DesktopWindow(this,workspace,title,body,wallpaper,this::renderTaskbar,store,id,layoutKey);next.safeTop(windowTopInset);windows.put(id,next);
         if(workspace.getWidth()>0){next.open();renderTaskbar();}else workspace.post(()->{if(!destroyed&&next.getParent()==null){next.open();renderTaskbar();}});
     }
     private void notes(){
@@ -783,7 +822,22 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
             return;
         }
         if(request==PICK_MEDIA){if(result==RESULT_OK&&data!=null)importMedia(data);return;}
-        if(request==305){if(result==RESULT_OK&&data!=null&&data.getData()!=null){Uri uri=data.getData();try{getContentResolver().takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(SecurityException ignored){}open("setting:page:background");DesktopWindow panel=windows.get("@control");if(panel!=null&&panel.body instanceof VistaControlPanel)((VistaControlPanel)panel.body).wallpaperChosen(uri.toString());}return;}
+        if(request==305){
+            if(result==RESULT_OK&&data!=null&&data.getData()!=null){
+                Uri uri=data.getData();
+                try{getContentResolver().takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);}
+                catch(SecurityException ignored){}
+                List<DesktopWindow> ordered=orderedWindows();Collections.reverse(ordered);
+                for(DesktopWindow window:ordered)if(window.getVisibility()==View.VISIBLE&&window.body instanceof VistaControlPanel){
+                    VistaControlPanel panel=(VistaControlPanel)window.body;
+                    if(panel.page().equals("background")){panel.wallpaperChosen(uri.toString());return;}
+                }
+                open("setting:page:background");
+                DesktopWindow panel=windows.get("@control");
+                if(panel!=null&&panel.body instanceof VistaControlPanel)((VistaControlPanel)panel.body).wallpaperChosen(uri.toString());
+            }
+            return;
+        }
         if(request==304){if(result==RESULT_OK&&data!=null&&data.getData()!=null)openPhoto(data.getData(),null,"image/*",null,"@files");return;}
         DesktopWindow browser=windows.get("@browser");if(browser!=null&&browser.getParent()!=null&&browser.body instanceof BrowserPanel&&((BrowserPanel)browser.body).result(request,result,data))return;
         if((request==15||request==16)&&result==RESULT_OK&&data!=null&&data.getData()!=null){
@@ -809,7 +863,13 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
     private void addAction(LinearLayout parent,String label,Runnable action){LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(8);parent.addView(Aero.button(this,label,action),lp);}
     private int dp(int value){return Aero.dp(this,value);}
     private void toast(String message){Toast.makeText(this,message,Toast.LENGTH_SHORT).show();}
-    private void updateClock(){if(tray!=null)tray.clockNow();if(clock!=null){Date now=new Date();clock.setText(DateFormat.getTimeFormat(this).format(now)+(getResources().getConfiguration().screenWidthDp<480&&store.prefs.getBoolean("taskbar_show_labels",false)?"":"\n"+new SimpleDateFormat("MMM d",Locale.getDefault()).format(now)));}}
+    private void updateClock(){
+        if(tray!=null)tray.clockNow();
+        if(clock!=null){
+            Date now=new Date();
+            clock.setText(DateFormat.getTimeFormat(this).format(now)+"\n"+new SimpleDateFormat("MMM d",Locale.getDefault()).format(now));
+        }
+    }
     private void handleBack(){
         if(restoringBackup)return;
         if(previews!=null&&previews.dismiss())return;
@@ -888,7 +948,6 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
         if(shell!=null)shell.requestApplyInsets();
     }
     @Override public void sidebarChanged(){workspace.requestLayout();renderTaskbar();}
-    @Override public void gallery(){gadgetGallery();}
     @Override public void readingsChanged(){updateWeatherSummary();for(DesktopWindow tool:windows.values())if(tool.body instanceof GadgetPanel&&tool.getParent()!=null)((GadgetPanel)tool.body).readings();}
     @Override public void gadgetAction(String id){
         startMenu.hide();

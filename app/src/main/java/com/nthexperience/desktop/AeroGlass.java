@@ -13,6 +13,8 @@ final class AeroGlass extends Drawable {
     private final RectF rect=new RectF();
     private final Path clip=new Path();
     private boolean active=true;
+    private boolean stacked;
+    private int insetTop;
     private int drawableAlpha=255;
     static final int DEFAULT_OPACITY=85;
     private final android.content.SharedPreferences prefs;
@@ -20,8 +22,10 @@ final class AeroGlass extends Drawable {
     static final int[] TINTS={0xff599cbd,0xff58636e,0xff3e9ca0,0xff6d986c,0xff8b78b0,0xffb69a5c,0xffa56872,0xffb4cad7};
     AeroGlass(AeroWallpaper wallpaper,int style){this.wallpaper=wallpaper;this.style=style;prefs=wallpaper.getContext().getSharedPreferences("desktop",0);wallpaper.register(this);}
     void active(boolean value){if(active!=value){active=value;invalidateSelf();}}
+    void stacked(boolean value){stacked=value;invalidateSelf();}
+    void insetTop(int pixels){insetTop=pixels;invalidateSelf();}
     @Override public void draw(Canvas c){
-        rect.set(getBounds());float d=getCallback() instanceof View?((View)getCallback()).getResources().getDisplayMetrics().density:1;
+        rect.set(getBounds());rect.top+=insetTop;if(rect.isEmpty())return;float d=getCallback() instanceof View?((View)getCallback()).getResources().getDisplayMetrics().density:1;
         float radius=(style==TASKBAR||style==SIDEBAR)?0:6*d;
         boolean transparent=prefs.getBoolean("aero_transparency",true);
         int opacity=transparent?Math.max(0,Math.min(100,prefs.getInt("aero_opacity",DEFAULT_OPACITY))):100;
@@ -44,7 +48,12 @@ final class AeroGlass extends Drawable {
             Path beam=new Path();beam.moveTo(rect.width()*.05f,0);beam.lineTo(rect.width()*.35f,0);beam.lineTo(rect.width()*.78f,rect.height());beam.lineTo(rect.width()*.48f,rect.height());beam.close();c.drawPath(beam,p);p.setShader(null);
         }
         c.restoreToCount(save);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(d);p.setColor(style==WINDOW?0xc5f3fbff:0x90b8ced9);c.drawRoundRect(rect.left+d*.5f,rect.top+d*.5f,rect.right-d*.5f,rect.bottom-d*.5f,radius,radius,p);
-        p.setColor(0x55000000);c.drawLine(rect.left,rect.bottom-d,rect.right,rect.bottom-d,p);p.setStyle(Paint.Style.FILL);c.restoreToCount(layer);
+        p.setColor(0x55000000);c.drawLine(rect.left,rect.bottom-d,rect.right,rect.bottom-d,p);
+        if(stacked&&rect.width()>12*d){
+            p.setColor(0xb5c6e4f5);
+            for(int i=1;i<=2;i++)c.drawLine(rect.right-(2+3*i)*d,rect.top+(4-i)*d,rect.right-(2+3*i)*d,rect.bottom-(4-i)*d,p);
+        }
+        p.setStyle(Paint.Style.FILL);c.restoreToCount(layer);
     }
     private static int mix(int a,int b,float t){return Color.argb(Color.alpha(a),Math.round(Color.red(a)*(1-t)+Color.red(b)*t),Math.round(Color.green(a)*(1-t)+Color.green(b)*t),Math.round(Color.blue(a)*(1-t)+Color.blue(b)*t));}
     @Override public void setAlpha(int alpha){drawableAlpha=Math.max(0,Math.min(255,alpha));invalidateSelf();}

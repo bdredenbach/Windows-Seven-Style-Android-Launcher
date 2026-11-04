@@ -5,7 +5,7 @@ import java.util.*;
 /** One owner per setting. Category tasks and search resolve to the same destinations. */
 final class ControlPanelCatalog {
     static final String[][] CATEGORIES={
-        {"system","System and Maintenance","computer"},{"security","Security","security"},
+        {"system","System and Security","security"},
         {"network","Network and Internet","network"},{"hardware","Hardware and Sound","hardware"},
         {"programs","Programs","programs"},{"accounts","User Accounts","accounts"},
         {"appearance","Appearance and Personalization","appearance"},{"clock","Clock, Language, and Region","clock"},
@@ -30,8 +30,8 @@ final class ControlPanelCatalog {
         new Panel("access","system","File access","files","Set up device access or connect folders","storage-access","permissions;storage access"),
         new Panel("storage","system","Storage","drive","Storage use and device cleanup · Android","android:storage","disk space"),
         new Panel("power","system","Power Options","power","Battery and power saving · Android","android:battery","battery settings"),
-        new Panel("security","security","Security settings","security","Screen lock and device security · Android","android:security","lock screen"),
-        new Panel("privacy","security","Privacy settings","security","Review privacy controls · Android","android:privacy","privacy permissions"),
+        new Panel("security","system","Security settings","security","Screen lock and device security · Android","android:security","lock screen"),
+        new Panel("privacy","system","Privacy settings","security","Review privacy controls · Android","android:privacy","privacy permissions"),
         new Panel("network","network","Network and Sharing Center","network","View network connections · Android","android:network","Network connections;Internet settings",t("Wi-Fi","Choose a wireless network · Android","android:wifi")),
         new Panel("sound","hardware","Sound","sound","Volume and device sounds · Android","android:sound","audio volume",t("Desktop sound effects","Original optional completion and error cues","page:sounds")),
         new Panel("display","hardware","Display Settings","computer","Brightness, display size and rotation · Android","android:display","display brightness",t("Desktop brightness","Adjust Nth or whole-phone brightness","open:@brightness")),
@@ -40,10 +40,10 @@ final class ControlPanelCatalog {
         new Panel("defaults","programs","Default Programs","programs","Choose default Android apps","android:defaults","default applications"),
         new Panel("managers","programs","File Managers","folderapps","Organize your file manager shortcuts","open:@filemanagers","file manager apps"),
         new Panel("accounts","accounts","User Accounts","accounts","Change your desktop name and profile picture","page:accounts","Change your desktop name;Change your profile picture",t("Device accounts","Manage accounts on your device · Android","android:accounts")),
-        new Panel("personalization","appearance","Personalization","appearance","Change the appearance and sounds of your desktop","page:personalization","",t("Window Color and Appearance","Glass color, intensity, transparency and opacity","page:colors"),t("Desktop Background","Choose your aurora wallpaper","page:background"),t("Startup and Sounds","Startup intro, reboot, chime and reduced motion","page:startup")),
+        new Panel("personalization","appearance","Personalization","appearance","Change the appearance and sounds of your desktop","page:personalization","",t("Window Color","Glass color, intensity, transparency and opacity","page:colors"),t("Desktop Background","Choose a stock or personal wallpaper","page:background"),t("Startup and Sounds","Startup intro, reboot, chime and reduced motion","page:startup")),
         new Panel("icons","appearance","Desktop Settings","computer","Desktop icons, grid, spacing, labels and snapping","page:icons","Desktop Icon Settings;desktop layout",t("Manage desktop shortcuts","Desktop Organization: folders, shortcut names and ordering","open:@organize")),
         new Panel("taskbar","appearance","Taskbar and Start Menu","control","Status bar, Android app buttons and default home","page:taskbar","taskbar properties",t("Quick Launch","Choose and order taskbar shortcuts","open:@quicklaunch"),t("Taskbar grouping","Group similar folder windows when space runs out","page:grouping")),
-        new Panel("sidebar","appearance","Windows Sidebar Properties","gadgets","Show, hide and arrange the Nth gadget bar","page:sidebar","Sidebar Properties",t("Desktop Gadgets","Add and arrange desktop gadgets","open:@gadgets")),
+        new Panel("sidebar","appearance","Gadget Settings","gadgets","Show, hide and arrange desktop gadgets","page:sidebar","Sidebar Properties;Windows Sidebar Properties",t("Desktop Gadgets","Add and arrange desktop gadgets","open:@gadgets")),
         new Panel("date","clock","Date and Time","clock","Device date and time zone · Android","android:date","",t("Clock appearance","Clock face and second hand","page:clock")),
         new Panel("region","clock","Regional and Language Options","network","Device language and region · Android","android:language","language locale"),
         new Panel("accessibility","accessibility","Ease of Access Center","accessibility","Accessibility services and display aids · Android","android:accessibility","accessibility")));

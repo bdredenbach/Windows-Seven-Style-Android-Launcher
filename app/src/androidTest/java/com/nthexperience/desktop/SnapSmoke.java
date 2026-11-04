@@ -64,11 +64,10 @@ public final class SnapSmoke extends Instrumentation {
             runOnMainSync(() -> sidebar.visible(true));
             settle();
 
-            // Derive the expected top from the real shell, and independently reserve the
-            // visible always-on-top Sidebar from the workspace width.
+            // Freestanding gadgets do not reserve part of the workspace.
             runOnMainSync(left::maximize);
             settle();
-            Rect work = new Rect(0, (int) left.getY(), workspace.getWidth() - sidebar.getWidth(), workspace.getHeight());
+            Rect work = new Rect(0, (int) left.getY(), workspace.getWidth(), workspace.getHeight());
             check(work.width() / 2 >= dp(240), "Landscape leaves room for two Explorer windows");
             runOnMainSync(() -> left.arrange(dp(25), dp(55), dp(300), dp(230)));
             settle();
@@ -101,7 +100,7 @@ public final class SnapSmoke extends Instrumentation {
             int rightEdge = work.right - dp(12);
             begin(right);
             moveTo(rightEdge, edgeY);
-            checkPreview(right, rightHalf, "Right outline leaves the always-on-top Sidebar clear");
+            checkPreview(right, rightHalf, "Right outline fills the usable workspace behind floating gadgets");
             input(MotionEvent.ACTION_UP, rightEdge, edgeY);
             settle();
             check(rightHalf.equals(bounds(right)), "Right window fills the exact right half");

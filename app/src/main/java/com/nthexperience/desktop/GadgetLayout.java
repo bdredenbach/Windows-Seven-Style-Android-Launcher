@@ -17,6 +17,7 @@ final class GadgetLayout {
         save();
     }
     JSONObject placement(String id){JSONObject value=data.optJSONObject(id);if(value==null){value=new JSONObject();put(value,"docked",true);put(value,"x",.4);put(value,"y",.15);put(value,"scale",1);put(data,id,value);}return value;}
+    // Older backups use "docked" for automatic placement at the edge.
     boolean docked(String id){return placement(id).optBoolean("docked",true);}
     float x(String id){return (float)placement(id).optDouble("x",.4);}
     float y(String id){return (float)placement(id).optDouble("y",.15);}
@@ -26,7 +27,6 @@ final class GadgetLayout {
     boolean visible(){return data.optBoolean("visible",true);}
     void visible(boolean show){put(data,"visible",show);save();}
     List<String> ordered(){List<String> enabled=store.gadgets(),result=new ArrayList<>();JSONArray order=data.optJSONArray("order");if(order!=null)for(int i=0;i<order.length();i++){String id=order.optString(i);if(enabled.contains(id)&&!result.contains(id))result.add(id);}for(String id:enabled)if(!result.contains(id))result.add(id);return result;}
-    void before(String moving,String target){List<String> ids=ordered();if(!ids.contains(moving)||moving.equals(target))return;ids.remove(moving);int index=ids.indexOf(target);ids.add(index<0?ids.size():index,moving);put(data,"order",new JSONArray(ids));save();}
     void save(){store.prefs.edit().putString("gadget_layout_"+key,data.toString()).apply();}
     static void put(JSONObject target,String name,Object value){try{target.put(name,value);}catch(JSONException ignored){}}
 }

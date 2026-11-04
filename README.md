@@ -2,6 +2,8 @@
 
 Nth Desktop Seven is a Windows 7–inspired Android home launcher. Its first test build, **0.1.0**, adds Aero Snap and installs alongside Nth Desktop Vista under the separate app ID `com.nthexperience.desktop.seven`.
 
+**0.3.0** groups Explorer windows into one stacked taskbar button by default. Hold it to see updating thumbnails and choose a window. Start has a raised profile picture, and the taskbar shows the time above the date. Personalization offers theme previews and the desktop context menu changes the wallpaper. Gadgets can be placed or resized directly on the desktop.
+
 **0.2.0** adds an N⁷ orb and four blue flags that swirl into it during startup. Seven Blue is the default desktop background when no background has been saved. Pinned and running apps share icon slots. Taskbar and Start Menu settings can show labels and the classic Quick Launch strip. Explorer’s Libraries view opens the real document, picture, music and video folders. Media Player has a light Library and dark Now Playing view, while full-screen Media Center uses a blue Start screen with Music, Videos and Now Playing hubs.
 
 **0.1.1** opens Android’s default Home chooser once after the intro or as soon as the desktop is ready when the intro is off. Existing Seven 0.1.0 installs receive the offer on their next launch if Seven is still eligible.

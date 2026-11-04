@@ -33,6 +33,7 @@ final class VistaExplorer extends VistaShell {
     private String viewMode,groupBy="None";private boolean recentOnly,showHidden;private final Set<String> collapsedGroups=new HashSet<>();private DocumentOps.CopyUndo undoCopy;private FrameLayout detailIcon;private LinearLayout detailsPane;private TextView sendTo;
     private final LinkedHashMap<String,DocumentOps.Ref> selected=new LinkedHashMap<>();
     private final LinkedHashSet<String> expanded=new LinkedHashSet<>();private final Map<String,List<DocumentFolders.Item>> treeCache=new HashMap<>();private final Set<String> treeLoading=new HashSet<>();
+    private final View menuBar;
     private final LinearLayout crumbs;private final TextView cancelWork;private DocumentOps.Cancel operation;private DesktopContextMenu contextMenu;
     VistaExplorer(Context c,DesktopStore store,Actions actions,Files files,Supplier<List<AppCatalog.Entry>> apps,String initial){this(c,store,actions,files,apps,initial,null);}
     VistaExplorer(Context c,DesktopStore store,Actions actions,Files files,Supplier<List<AppCatalog.Entry>> apps,String initial,Selection picker){
@@ -40,11 +41,16 @@ final class VistaExplorer extends VistaShell {
         commands.addView(command("Organize ▾",this::organize),new LayoutParams(-2,dp(36)));commands.addView(command("Views ▾",this::views),new LayoutParams(-2,dp(36)));
         cancelWork=command("Cancel operation",()->{if(operation!=null)operation.cancel();});cancelWork.setContentDescription("Cancel file operation");cancelWork.setVisibility(GONE);commands.addView(cancelWork,new LayoutParams(-2,dp(36)));
         LinearLayout location=(LinearLayout)address.getParent();int at=location.indexOfChild(address);location.removeView(address);crumbs=new LinearLayout(c);crumbs.setGravity(Gravity.CENTER_VERTICAL);crumbs.setBackground(Aero.panel(c,0xffffffff,0xfff1f7fb,1,0xff8ea6b8));crumbs.setContentDescription("Address bar");location.addView(crumbs,at,new LayoutParams(0,dp(32),1));
-        explorerChrome(this::classicMenu);
-        sendTo=command("Send to ▾",this::sendSelected);sendTo.setTextColor(Color.WHITE);sendTo.setContentDescription("Send selected files");if(picker==null)commands.addView(sendTo,new LayoutParams(-2,dp(36)));
+        menuBar=explorerChrome(this::classicMenu);
+        menuBar.setVisibility(store.prefs.getBoolean("explorer_menu_bar",false)?VISIBLE:GONE);
+        ((View)commands.getParent()).setBackground(Aero.gloss(c,new int[]{0xfff6faff,0xffeaf2fb,0xffdce8f6},0,0xffbacddd));
+        folders.setTextColor(0xff214567);
+        for(int i=0;i<commands.getChildCount();i++)((TextView)commands.getChildAt(i)).setTextColor(0xff214567);
+        side.setBackground(Aero.panel(c,0xfffdfefe,0xfff2f7fd,0,0xffd1dce8));
+        sendTo=command("Send to ▾",this::sendSelected);sendTo.setTextColor(0xff214567);sendTo.setContentDescription("Send selected files");if(picker==null)commands.addView(sendTo,new LayoutParams(-2,dp(36)));
         TextView refresh=command("↻",this::refreshFiles);refresh.setTextSize(19);refresh.setContentDescription("Refresh folder");location.addView(refresh,new LayoutParams(dp(28),dp(32)));
         FrameLayout queryBox=new FrameLayout(c);ViewGroup queryParent=(ViewGroup)search.getParent();ViewGroup.LayoutParams queryLayout=search.getLayoutParams();queryParent.removeView(search);queryBox.addView(search,new FrameLayout.LayoutParams(-1,-1));search.setPadding(dp(7),0,dp(26),0);TextView clear=command("×",()->search.setText(""));clear.setTextSize(18);clear.setContentDescription("Clear folder search");queryBox.addView(clear,new FrameLayout.LayoutParams(dp(26),-1,Gravity.END));queryParent.addView(queryBox,queryLayout);
-        int statusIndex=indexOfChild(status);removeView(status);detailsPane=new LinearLayout(c);detailsPane.setContentDescription("Explorer details pane");detailsPane.setGravity(Gravity.CENTER_VERTICAL);detailsPane.setPadding(dp(10),dp(3),dp(8),dp(3));detailsPane.setBackground(Aero.panel(c,0xffe6f5fc,0xffc6e0ef,0,0xff9dbacb));detailIcon=new FrameLayout(c);detailsPane.addView(detailIcon,new LayoutParams(dp(42),dp(42)));status.setSingleLine(false);status.setMaxLines(3);status.setTextSize(11);status.setBackgroundColor(Color.TRANSPARENT);detailsPane.addView(status,new LayoutParams(0,-1,1));status.setGravity(Gravity.CENTER_VERTICAL);addView(detailsPane,statusIndex,new LayoutParams(-1,dp(54)));
+        int statusIndex=indexOfChild(status);removeView(status);detailsPane=new LinearLayout(c);detailsPane.setContentDescription("Explorer details pane");detailsPane.setGravity(Gravity.CENTER_VERTICAL);detailsPane.setPadding(dp(10),dp(3),dp(8),dp(3));detailsPane.setBackground(Aero.panel(c,0xfff4f8fd,0xffe4edf7,0,0xffc3d4e3));detailIcon=new FrameLayout(c);detailsPane.addView(detailIcon,new LayoutParams(dp(42),dp(42)));status.setSingleLine(false);status.setMaxLines(3);status.setTextSize(11);status.setBackgroundColor(Color.TRANSPARENT);detailsPane.addView(status,new LayoutParams(0,-1,1));status.setGravity(Gravity.CENTER_VERTICAL);addView(detailsPane,statusIndex,new LayoutParams(-1,dp(54)));
         enableNavigationToggle();addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{boolean wide=r-l>=dp(620);ViewGroup target=wide?location:queryParent;if(queryBox.getParent()!=target){((ViewGroup)queryBox.getParent()).removeView(queryBox);target.addView(queryBox,wide?new LayoutParams(dp(190),dp(32)):queryLayout);}detailsPane.setVisibility(b-t<dp(290)?GONE:VISIBLE);});
         back.setOnLongClickListener(v->{historyMenu(back);return true;});forward.setOnLongClickListener(v->{historyMenu(forward);return true;});start(initial);
     }
@@ -70,13 +76,25 @@ final class VistaExplorer extends VistaShell {
     private void libraries(){
         LinearLayout column=column();
         heading(column,"Libraries","Open your document, picture, music and video folders.");
+        LinearLayout tiles=column;
+        if(content.getWidth()>=dp(390)){
+            tiles=new LinearLayout(getContext());
+            column.addView(tiles,new LayoutParams(-1,-2));
+        }
+        int count=0;
         for(String kind:new String[]{"documents","pictures","music","videos"}){
             String label=deviceTitle(kind);
             if(!matches(label))continue;
-            int index=column.getChildCount();
-            task(column,kind,label,"Library folder",()->openFavorite(kind));
-            View row=column.getChildAt(index);
+            if(tiles!=column&&count>0&&count%2==0){
+                tiles=new LinearLayout(getContext());
+                column.addView(tiles,new LayoutParams(-1,-2));
+            }
+            LinearLayout row=row(kind,null,label,"Library folder");
+            row.setBackground(Aero.selection(getContext()));row.setFocusable(true);
+            row.setOnClickListener(v->openFavorite(kind));
+            tiles.addView(row,tiles==column?new LayoutParams(-1,dp(59)):new LayoutParams(0,dp(59),1));
             ContextMenus.bind(row,(x,y)->favoriteMenu(row,kind,label,x,y));
+            count++;
         }
         status.setText("Libraries");
         body(scrolling(column));
@@ -191,7 +209,22 @@ final class VistaExplorer extends VistaShell {
     private void removeBookmark(Uri uri){JSONArray values=LinkedFiles.list(store);for(int i=values.length()-1;i>=0;i--)if(values.optJSONObject(i)!=null&&sameBookmark(values.optJSONObject(i).optString("uri"),uri))values.remove(i);store.prefs.edit().putString("linked_files",values.toString()).apply();}
     private boolean sameBookmark(String value,Uri uri){try{return DocumentOps.same(Uri.parse(value),uri);}catch(RuntimeException ex){return value.equals(uri.toString());}}
     private void background(View anchor,float x,float y){DesktopContextMenu menu=menu("Folder context menu");menu.submenu("View","appearance",this::views);menu.submenu("Sort by","programs",()->sortMenu(anchor));menu.submenu("Group by","programs",()->groupMenu(anchor));menu.item("Refresh","refresh",this::refreshFiles);menu.separator();menu.item("Paste","paste",!busy&&canCreate()&&!ExplorerClipboard.files.isEmpty(),this::paste);menu.item("Undo Copy","empty",!busy&&undoCopy!=null,this::undoCopy);menu.separator();menu.item("New folder","files",!busy&&canCreate(),this::newFolder);menu.submenu("New","files",()->newMenu(anchor));if(page().startsWith("folder:")){menu.item("Select all","checklist",listing!=null&&!listing.items.isEmpty(),this::selectAll);menu.item("Clear selection","checklist",selectionMode||!selected.isEmpty(),this::clearSelection);menu.item("Customize This Folder…","appearance",this::customize);menu.item("Properties","control",this::folderProperties);if(!canCreate()&&(!StorageAccess.ours(parent())||!StorageAccess.has(getContext())))menu.item("Enable changes for this folder…","security",()->requestChanges(parent()));}else menu.item("Add a folder…","files",files::chooseFolder);show(menu,anchor,x,y);}
-    private void organize(){ContextMenus.centered(commands,(x,y)->background(commands,x,y));}
+    private void organize(){
+        DesktopContextMenu menu=menu("Organize");
+        menu.submenu("Layout","appearance",()->{
+            DesktopContextMenu layout=menu("Explorer layout");
+            layout.checked("Menu bar",menuBar.getVisibility()==VISIBLE,()->{
+                boolean show=menuBar.getVisibility()!=VISIBLE;
+                menuBar.setVisibility(show?VISIBLE:GONE);
+                store.prefs.edit().putBoolean("explorer_menu_bar",show).apply();
+            });
+            layout.checked("Navigation pane",navigationPaneVisible(),this::toggleNavigationPane);
+            ContextMenus.centered(commands,(x,y)->show(layout,commands,x,y));
+        });
+        menu.submenu("Folder commands","files",()->ContextMenus.centered(commands,(x,y)->background(commands,x,y)));
+        menu.item("Folder and search options…","control",this::folderOptions);
+        ContextMenus.centered(commands,(x,y)->show(menu,commands,x,y));
+    }
     private void views(){DesktopContextMenu menu=menu("View options");for(String label:new String[]{"Large icons","Medium icons","Small icons","List","Details","Tiles"})menu.checked(label,viewMode.equals(label),()->setView(label));menu.separator();menu.checked("Navigation pane",navigationPaneVisible(),this::toggleNavigationPane);ContextMenus.centered(commands,(x,y)->show(menu,commands,x,y));}
     private void setView(String label){viewMode=label;details=label.equals("Details");store.prefs.edit().putString("explorer_view_mode",label).putBoolean("explorer_details",details).apply();saveFolderStyle();render();}
     private void sortMenu(View anchor){DesktopContextMenu menu=menu("Sort options");for(String label:new String[]{"Name","Date modified","Type","Size"})menu.checked(label,sort.equals(label),()->{sort=label;saveFolderStyle();render();});menu.separator();menu.checked("Descending",descending,()->{descending=!descending;saveFolderStyle();render();});ContextMenus.centered(anchor,(x,y)->show(menu,anchor,x,y));}
@@ -225,7 +258,7 @@ final class VistaExplorer extends VistaShell {
     private LinearLayout row(String kind,android.graphics.drawable.Drawable drawable,String name,String description){LinearLayout row=new LinearLayout(getContext());row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(11),dp(7),dp(9),dp(7));View icon;if(drawable==null)icon=new AeroIcon(getContext(),kind);else{ImageView image=new ImageView(getContext());image.setImageDrawable(drawable);image.setScaleType(ImageView.ScaleType.FIT_CENTER);icon=image;}row.addView(icon,new LayoutParams(dp(details?28:40),dp(details?28:40)));LinearLayout text=Aero.column(getContext());text.setPadding(dp(10),0,0,0);TextView title=Aero.text(getContext(),name,13,Aero.INK);title.setMaxLines(2);title.setEllipsize(android.text.TextUtils.TruncateAt.END);text.addView(title);TextView sub=Aero.text(getContext(),description,11,0xff6c7e8a);sub.setSingleLine(true);sub.setEllipsize(android.text.TextUtils.TruncateAt.END);text.addView(sub);row.addView(text,new LayoutParams(0,-2,1));row.setContentDescription(name);return row;}
     static String icon(String mime,boolean directory){return directory?"files":mime.equals(FileLaunch.APK)?"programs":mime.startsWith("image/")?"picturefile":mime.startsWith("audio/")?"musicfile":mime.startsWith("video/")?"videofile":mime.equals("application/pdf")?"pdffile":mime.contains("zip")?"archivefile":"documentfile";}
     private static String fileType(String mime){return mime.equals(FileLaunch.APK)?"Android app package":mime.startsWith("image/")?"Picture":mime.startsWith("audio/")?"Audio file":mime.startsWith("video/")?"Video":mime.startsWith("text/")?"Text document":mime.equals("application/pdf")?"PDF document":mime.equals("application/json")?"JSON document":mime.contains("zip")?"ZIP archive":mime.contains("xml")?"XML document":"File";}
-    private void renderTree(){side.removeAllViews();sideHeading("Favorite Links");favoriteLink("Documents","documents",()->{recentOnly=false;favorite("documents","Documents");});favoriteLink("Pictures","pictures",()->{recentOnly=false;favorite("pictures","Pictures");});favoriteLink("Music","music",()->{recentOnly=false;favorite("music","Music");});favoriteLink("Recently Changed","clock",()->{recentOnly=true;sort="Date modified";descending=true;if(!page().startsWith("folder:"))openDevice("documents");else render();});favoriteLink("Searches","search",()->navigate("searches"));favoriteLink("More »","files",()->favoriteLinksMenu());sideHeading("Folders");if(picker==null)favoriteLink("Libraries","folderapps",()->navigate("libraries"));favoriteLink("Desktop","computer",()->actions.action("show-desktop"));favoriteLink("Computer","computer",()->{recentOnly=false;navigate("computer");});JSONArray roots=navigationRoots();for(int i=0;i<roots.length();i++){JSONObject root=roots.optJSONObject(i);if(root!=null)treeRow(DocumentFolders.rootPage(root.optString("uri"),root.optString("name")),0);} }
+    private void renderTree(){side.removeAllViews();sideHeading("Favorites");favoriteLink("Documents","documents",()->{recentOnly=false;favorite("documents","Documents");});favoriteLink("Pictures","pictures",()->{recentOnly=false;favorite("pictures","Pictures");});favoriteLink("Music","music",()->{recentOnly=false;favorite("music","Music");});favoriteLink("Recently Changed","clock",()->{recentOnly=true;sort="Date modified";descending=true;if(!page().startsWith("folder:"))openDevice("documents");else render();});favoriteLink("Searches","search",()->navigate("searches"));favoriteLink("More »","files",()->favoriteLinksMenu());if(picker==null){sideHeading("Libraries");favoriteLink("Libraries","folderapps",()->navigate("libraries"));}sideHeading("Computer");favoriteLink("Desktop","computer",()->actions.action("show-desktop"));favoriteLink("Computer","computer",()->{recentOnly=false;navigate("computer");});JSONArray roots=navigationRoots();for(int i=0;i<roots.length();i++){JSONObject root=roots.optJSONObject(i);if(root!=null)treeRow(DocumentFolders.rootPage(root.optString("uri"),root.optString("name")),0);} }
     private void sideHeading(String title){TextView label=Aero.text(getContext(),title,11,0xff6d7478);label.setPadding(0,dp(8),0,dp(5));side.addView(label);}
     private void favoriteLink(String title,String kind,Runnable action){LinearLayout row=new LinearLayout(getContext());row.setGravity(Gravity.CENTER_VERTICAL);row.setBackground(Aero.selection(getContext()));row.addView(new AeroIcon(getContext(),kind),new LayoutParams(dp(18),dp(18)));TextView label=Aero.text(getContext(),title,11,0xff14649b);label.setSingleLine(true);label.setEllipsize(android.text.TextUtils.TruncateAt.END);label.setPadding(dp(5),0,0,0);row.addView(label,new LayoutParams(0,dp(29),1));row.setContentDescription("Navigation: "+title);row.setOnClickListener(v->action.run());side.addView(row);}
     private void favoriteLinksMenu(){DesktopContextMenu menu=menu("Favorite Links");for(String[] target:StorageAccess.FAVORITES)if(!Arrays.asList("documents","pictures","music").contains(target[0]))menu.item(target[1],target[0],()->{recentOnly=false;openFavorite(target[0]);});if(picker==null)menu.item("File Managers","folderapps",()->navigate("managers"));menu.item("Add a folder…","files",files::chooseFolder);ContextMenus.centered(side,(x,y)->show(menu,side,x,y));}

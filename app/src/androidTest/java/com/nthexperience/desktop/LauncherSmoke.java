@@ -92,7 +92,7 @@ public class LauncherSmoke extends Instrumentation {
             shellChecks();
             desktopFixChecks();
             organizationChecks();
-            result.putString("stream","PASS: real desktop grouping and folder editing, folder rotation, Quick Launch ordering, native backup file export/import preview, restore and undo, corrupt backup rejection; desktop shortcut cleanup, real default-home prompts, Vista context menu, cutout alignment in both landscape rotations; Control Panel categories/classic/search, native personalization, Android settings dispatch, Explorer/file-manager folders, real picker grants, nested folder browsing and rotation state; landscape, gadget drag/dock/resize, independent saved layouts, layout lock, rotation and activity recreation with window/cursor state; app discovery, Start search/All Programs, autosave, window controls, wallpapers, gadget gallery, sticky notes, clock settings, weather parsing and configuration.\n");
+            result.putString("stream","PASS: real desktop grouping and folder editing, folder rotation, Quick Launch ordering, native backup file export/import preview, restore and undo, corrupt backup rejection; desktop shortcut cleanup, real default-home prompts, Vista context menu, cutout alignment in both landscape rotations; Control Panel categories/classic/search, native personalization, Android settings dispatch, Explorer/file-manager folders, real picker grants, nested folder browsing and rotation state; landscape, gadget drag/align/resize, independent saved layouts, layout lock, rotation and activity recreation with window/cursor state; app discovery, Start search/All Programs, autosave, window controls, wallpapers, gadget gallery, sticky notes, clock settings, weather parsing and configuration.\n");
             restoreGadgets(oldGadgets);((Application)getTargetContext().getApplicationContext()).unregisterActivityLifecycleCallbacks(lifecycle);finish(Activity.RESULT_OK,result);
         } catch(Throwable failure){
             if(previous!=null)getTargetContext().getSharedPreferences("desktop",0).edit().putString("note",previous).commit();
@@ -104,12 +104,12 @@ public class LauncherSmoke extends Instrumentation {
     private void layoutChecks() throws Exception {
         // Exercise first-visit landscape cloning independently of earlier rotation suites.
         ui(()->new DesktopStore(getTargetContext()).prefs.edit().remove("gadget_layout_landscape").commit());
-        progress("dragging Clock out of the Sidebar");
+        progress("dragging the desktop Clock");
         View clock=find(v->"Clock gadget".equals(v.getContentDescription()));check(clock!=null,"Clock available for drag");
         int[] rootLocation=new int[2];root.getLocationOnScreen(rootLocation);
         drag(clock,rootLocation[0]+Math.round(root.getWidth()*.32f),rootLocation[1]+Math.round(root.getHeight()*.28f));
-        check(find(v->"Clock floating gadget".equals(v.getContentDescription()))!=null,"Long drag detaches a gadget");
-        GadgetLayout portrait=new GadgetLayout(new DesktopStore(getTargetContext()),"portrait");check(!portrait.docked("clock"),"Detached position saved");
+        check(find(v->"Clock floating gadget".equals(v.getContentDescription()))!=null,"Long drag keeps the gadget on the desktop");
+        GadgetLayout portrait=new GadgetLayout(new DesktopStore(getTargetContext()),"portrait");check(!portrait.docked("clock"),"Free position saved");
         View grip=find(v->"Resize Clock gadget".equals(v.getContentDescription()));check(grip!=null,"Floating gadget has resize grip");
         int[] loc=new int[2];grip.getLocationOnScreen(loc);gesture(grip,loc[0]+grip.getWidth()/2f+35*activity.getResources().getDisplayMetrics().density,loc[1]+grip.getHeight()/2f+35*activity.getResources().getDisplayMetrics().density,false);
         portrait=new GadgetLayout(new DesktopStore(getTargetContext()),"portrait");check(portrait.scale("clock")>1.1f,"Corner grip resizes and persists");String portraitSaved=new DesktopStore(getTargetContext()).prefs.getString("gadget_layout_portrait","");snapshot("floating-gadgets.png");
@@ -127,10 +127,11 @@ public class LauncherSmoke extends Instrumentation {
         ui(()->find(v->"Start menu".equals(v.getContentDescription())).performClick());
         check(find(v->"Notepad text".equals(v.getContentDescription()))==null,"Minimized state survives rotation");
         check(portraitSaved.equals(new DesktopStore(getTargetContext()).prefs.getString("gadget_layout_portrait","")),"Portrait layout is unchanged by landscape fitting");
-        progress("checking docking, layout lock and recreation");
-        View floatingClock=find(v->"Clock gadget".equals(v.getContentDescription()));View dock=find(v->"Desktop gadget sidebar".equals(v.getContentDescription()));int[] dockLoc=new int[2];dock.getLocationOnScreen(dockLoc);drag(floatingClock,dockLoc[0]+dock.getWidth()/2,dockLoc[1]+Math.min(dock.getHeight()-20,40));
-        check(find(v->"Clock docked gadget".equals(v.getContentDescription()))!=null,"Dropping on Sidebar docks a gadget");
-        check(!new GadgetLayout(new DesktopStore(getTargetContext()),"landscape").docked("clock"),"Docking in portrait leaves landscape placement independent");
+        progress("checking edge alignment, layout lock and recreation");
+        ui(()->find(v->"Options for Clock gadget".equals(v.getContentDescription())).performClick());
+        clickSystemText("Align at desktop edge");
+        check(new GadgetLayout(new DesktopStore(getTargetContext()),"portrait").docked("clock"),"Alignment resets only this gadget to the edge");
+        check(!new GadgetLayout(new DesktopStore(getTargetContext()),"landscape").docked("clock"),"Portrait alignment leaves landscape placement independent");
         ui(()->new DesktopStore(getTargetContext()).prefs.edit().putBoolean("layout_locked",true).apply());
         View locked=find(v->"Clock gadget".equals(v.getContentDescription()));drag(locked,root.getWidth()*.3f,root.getHeight()*.25f);check(new GadgetLayout(new DesktopStore(getTargetContext()),"portrait").docked("clock"),"Lock prevents gadget moves");
         ui(()->new DesktopStore(getTargetContext()).prefs.edit().putBoolean("layout_locked",false).apply());
@@ -205,7 +206,6 @@ public class LauncherSmoke extends Instrumentation {
         String overlays=shell("cmd overlay list");if(overlays.contains("com.android.internal.systemui.navbar.threebutton"))shell("cmd overlay enable-exclusive --user 0 --category com.android.internal.systemui.navbar.threebutton");
         String cutout=null;for(String candidate:new String[]{"tall","corner","double"})if(overlays.contains("com.android.internal.display.cutout.emulation."+candidate)){cutout="com.android.internal.display.cutout.emulation."+candidate;break;}check(cutout!=null,"Emulator exposes a real display-cutout overlay");shell("cmd overlay enable-exclusive --user 0 --category "+cutout);Thread.sleep(500);refreshActivity();
         landscapeAngle(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE,android.view.Surface.ROTATION_90);edgeBounds();
-        if(find(v->"Clock floating gadget".equals(v.getContentDescription()))!=null){ui(()->find(v->"Options for Clock gadget".equals(v.getContentDescription())).performClick());clickSystemText("Dock in Sidebar");Thread.sleep(250);waitForIdleSync();}
         edgeBounds();snapshot("landscape-cutout-left.png");landscapeAngle(ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE,android.view.Surface.ROTATION_270);edgeBounds();snapshot("landscape-cutout-right.png");shell("cmd overlay disable --user 0 "+cutout);
         progress("desktop cleanup, default home and landscape cutout checks passed");
     }
@@ -255,7 +255,7 @@ public class LauncherSmoke extends Instrumentation {
         for(String label:new String[]{"Computer",BrowserPanel.NAME,"Notepad","Personalize"})check(find(v->{android.graphics.Rect visible=new android.graphics.Rect();return v.getContentDescription()!=null&&v.getContentDescription().toString().startsWith(label+". Hold")&&v.getGlobalVisibleRect(visible)&&v.getWidth()>0&&v.getHeight()>0;})!=null,"Desktop icon remains visible after rotation: "+label);
         paintedDesktopIcon();
         android.view.WindowInsets insets=root.getRootWindowInsets();android.graphics.Insets bars=insets.getInsets(android.view.WindowInsets.Type.systemBars()),navigation=insets.getInsets(android.view.WindowInsets.Type.navigationBars());
-        check(navigation.left>0||navigation.right>0||navigation.bottom>0,"On-screen Android navigation remains available");View taskbar=find(v->"Desktop taskbar".equals(v.getContentDescription())),sidebar=find(v->"Desktop gadget sidebar".equals(v.getContentDescription()));check(taskbar!=null&&sidebar!=null,"Taskbar and dock are visible");int[] r=new int[2],t=new int[2],s=new int[2];root.getLocationOnScreen(r);taskbar.getLocationOnScreen(t);sidebar.getLocationOnScreen(s);
+        check(navigation.left>0||navigation.right>0||navigation.bottom>0,"On-screen Android navigation remains available");View taskbar=find(v->"Desktop taskbar".equals(v.getContentDescription())),sidebar=find(v->"Desktop floating gadgets".equals(v.getContentDescription()));check(taskbar!=null&&sidebar!=null,"Taskbar and dock are visible");int[] r=new int[2],t=new int[2],s=new int[2];root.getLocationOnScreen(r);taskbar.getLocationOnScreen(t);sidebar.getLocationOnScreen(s);
         check(Math.abs(t[0]-(r[0]+bars.left))<=1,"Taskbar starts at the usable left edge without a cutout gap");check(Math.abs(t[0]+taskbar.getWidth()-(r[0]+root.getWidth()-bars.right))<=1,"Taskbar reaches the usable right edge without a cutout gap");check(Math.abs(s[0]+sidebar.getWidth()-(r[0]+root.getWidth()-bars.right))<=1,"Gadget dock reaches the usable right edge");
     }
     private void paintedDesktopIcon() throws Exception {
