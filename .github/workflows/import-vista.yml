@@ -1,0 +1,18 @@
+name: Import pinned Vista source
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/import-vista.yml']
+permissions:
+  contents: write
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Import the handoff commit into the Seven repository
+        run: |
+          git fetch --no-tags https://github.com/bdredenbach/Windows-Vista-Style-Android-Launcher.git 7c3fd109ac1fae51486c8f645b5f7cba7370bdeb
+          git push origin FETCH_HEAD:refs/heads/feature/nth-desktop-seven
