@@ -27,6 +27,9 @@ public final class FidelitySmoke extends Instrumentation {
         store.prefs.edit().putBoolean("layout_locked",false).remove("desktop_positions_landscape").apply();
         recycleFixture=store.createFolder("Recycle drag fixture",Collections.singletonList("@notes"));
         List<String> icons=store.desktop();icons.remove(recycleFixture);icons.remove("@recycle");icons.add(0,"@recycle");icons.add(0,recycleFixture);store.desktop(icons);
+        android.accessibilityservice.AccessibilityServiceInfo service=getUiAutomation().getServiceInfo();
+        service.flags|=android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS;
+        getUiAutomation().setServiceInfo(service);
         home=(MainActivity)startActivitySync(new Intent(Intent.ACTION_MAIN).setComponent(new ComponentName(getTargetContext(),MainActivity.class)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));root=home.getWindow().getDecorView();await(()->home.hasWindowFocus(),"Focused desktop");tray();taskbarModes();binProperties();shortcutRecycle();backgrounds();graphs();folders();
         result.putString("stream","PASS: task buttons preserve 0/50/100 glass opacity; equal Quick Launch separators; inline tray arrow and real device icons; draft-only background thumbnails, custom picture decode, Save changes and position; real PID/CPU/RAM/network graph sampling and pause/reduced motion; separate Explorer windows, taskbar family grouping, physical icon drag copy/move with exact bytes and original preservation; real folder desktop links and validated backups.\n");success=true;
     }catch(Throwable error){try{shot("fidelity-failure.png");StringBuilder tree=new StringBuilder();dump(getUiAutomation().getRootInActiveWindow(),tree,0);try(FileOutputStream out=getTargetContext().openFileOutput("fidelity-tree.txt",0)){out.write(tree.toString().getBytes(StandardCharsets.UTF_8));}}catch(Exception ignored){}StringWriter text=new StringWriter();error.printStackTrace(new PrintWriter(text));result.putString("stream","FAIL: "+text);
@@ -83,8 +86,7 @@ public final class FidelitySmoke extends Instrumentation {
         await(()->strip.canScrollHorizontally(1),"Scrollable mode allows overflow");
         ui(()->strip.scrollTo(strip.getWidth(),0));
         check(strip.getScrollX()>0,"Task strip can move to later buttons");
-        tap(find(v->"Taskbar commands".equals(v.getContentDescription())),700);
-        menuTap("Static");
+        selectTaskbarMode("Static");
         await(()->store.prefs.getBoolean("taskbar_static",false)&&strip.getScrollX()==0
                 && !strip.canScrollHorizontally(1),"Static resets scrolling and fits the task buttons");
         ViewGroup buttons=(ViewGroup)strip.getChildAt(0);
@@ -95,11 +97,18 @@ public final class FidelitySmoke extends Instrumentation {
         }
         check(Boolean.TRUE.equals(DesktopBackup.parse(DesktopBackup.snapshot(store).toString()).values.get("taskbar_static")),
                 "Desktop backups preserve Static mode");
-        tap(find(v->"Taskbar commands".equals(v.getContentDescription())),700);
-        menuTap("Scrollable");
+        selectTaskbarMode("Scrollable");
         await(()->!store.prefs.getBoolean("taskbar_static",true)&&strip.canScrollHorizontally(1),
                 "Switching back restores the scrollable strip");
         ui(()->{for(String id:ids)window(id).closeWindow();});
+    }
+    private void selectTaskbarMode(String mode)throws Exception{
+        for(int attempt=0;attempt<2;attempt++){
+            tap(find(v->"Taskbar commands".equals(v.getContentDescription())),700);
+            try{awaitNode(mode);break;}
+            catch(AssertionError failure){if(attempt==1)throw failure;}
+        }
+        menuTap(mode);
     }
     private void backgrounds()throws Exception{
         progress("background preview, save, custom picture and position");int saved=store.prefs.getInt("wallpaper",0);ui(()->home.open("setting:page:background"));VistaControlPanel control=(VistaControlPanel)window("@control").body;int choice=saved==1?2:1;tap(find(control,v->("Preview background: "+(choice==1?"Twilight":"Meadow")).equals(v.getContentDescription())),60);check(store.prefs.getInt("wallpaper",0)==saved,"Thumbnail only previews");tap(text(control,"Save changes"),60);check(store.prefs.getInt("wallpaper",0)==choice,"Save applies");shot("vista-background-picker.png");
@@ -181,7 +190,13 @@ public final class FidelitySmoke extends Instrumentation {
     private void input(long down,int action,float x,float y){MotionEvent e=MotionEvent.obtain(down,SystemClock.uptimeMillis(),action,x,y,0);e.setSource(InputDevice.SOURCE_TOUCHSCREEN);check(getUiAutomation().injectInputEvent(e,true),"Native input injected");e.recycle();}
     private void menuTap(String text)throws Exception{awaitNode(text);getUiAutomation().waitForIdle(150,2500);AccessibilityNodeInfo node=node(text);check(node!=null&&node.isEnabled(),"Enabled menu command: "+text);Rect r=new Rect();node.getBoundsInScreen(r);long t=SystemClock.uptimeMillis();input(t,MotionEvent.ACTION_DOWN,r.exactCenterX(),r.exactCenterY());Thread.sleep(55);input(t,MotionEvent.ACTION_UP,r.exactCenterX(),r.exactCenterY());Thread.sleep(150);}
     private void awaitNode(String text)throws Exception{long end=SystemClock.uptimeMillis()+8000;while(SystemClock.uptimeMillis()<end){if(node(text)!=null)return;Thread.sleep(100);}throw new AssertionError("Native menu node: "+text);}
-    private AccessibilityNodeInfo node(String text){return node(getUiAutomation().getRootInActiveWindow(),text);}private AccessibilityNodeInfo node(AccessibilityNodeInfo n,String text){if(n==null)return null;if(text.contentEquals(n.getText()==null?"":n.getText())||text.contentEquals(n.getContentDescription()==null?"":n.getContentDescription()))return n;for(int i=0;i<n.getChildCount();i++){AccessibilityNodeInfo r=node(n.getChild(i),text);if(r!=null)return r;}return null;}
+    private AccessibilityNodeInfo node(String text){
+        AccessibilityNodeInfo found=node(getUiAutomation().getRootInActiveWindow(),text);if(found!=null)return found;
+        for(android.view.accessibility.AccessibilityWindowInfo window:getUiAutomation().getWindows()){
+            found=node(window.getRoot(),text);if(found!=null)return found;
+        }
+        return null;
+    }private AccessibilityNodeInfo node(AccessibilityNodeInfo n,String text){if(n==null)return null;if(text.contentEquals(n.getText()==null?"":n.getText())||text.contentEquals(n.getContentDescription()==null?"":n.getContentDescription()))return n;for(int i=0;i<n.getChildCount();i++){AccessibilityNodeInfo r=node(n.getChild(i),text);if(r!=null)return r;}return null;}
     private void ui(Runnable r){runOnMainSync(r);try{Thread.sleep(80);}catch(InterruptedException e){throw new AssertionError(e);}}
     private void await(BooleanSupplier condition,String text)throws Exception{long end=SystemClock.uptimeMillis()+12000;while(SystemClock.uptimeMillis()<end){boolean[] ready={false};runOnMainSync(()->ready[0]=condition.getAsBoolean());if(ready[0])return;Thread.sleep(100);}throw new AssertionError(text);}
     private String shell(String command)throws Exception{try(ParcelFileDescriptor fd=getUiAutomation().executeShellCommand(command);InputStream in=new ParcelFileDescriptor.AutoCloseInputStream(fd);ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] buffer=new byte[4096];int n;while((n=in.read(buffer))!=-1)out.write(buffer,0,n);return out.toString("UTF-8");}}

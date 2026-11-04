@@ -75,21 +75,21 @@ public final class SnapSmoke extends Instrumentation {
             int edgeY = work.centerY();
             Rect leftHalf = new Rect(0, work.top, work.right / 2, work.bottom);
             begin(left);
-            input(MotionEvent.ACTION_MOVE, dp(4), edgeY);
+            moveTo(dp(12), edgeY);
             settle();
             check(bounds(left).left == 0 && home.hasWindowFocus(),
                     "The caption drag moves the window to the edge with the desktop focused");
             checkPreview(left, leftHalf, "Left outline fills only its usable half");
             saveScreenshot("aero-snap-left-preview");
-            input(MotionEvent.ACTION_MOVE, work.centerX(), edgeY);
+            moveTo(work.centerX(), edgeY);
             checkPreview(left, null, "Leaving the edge clears the outline");
-            input(MotionEvent.ACTION_MOVE, dp(4), edgeY);
-            input(MotionEvent.ACTION_CANCEL, dp(4), edgeY);
+            moveTo(dp(12), edgeY);
+            input(MotionEvent.ACTION_CANCEL, dp(12), edgeY);
             settle();
             check(floating.equals(bounds(left)), "Cancel restores the original floating bounds");
             checkPreview(left, null, "Cancel removes the outline");
 
-            drag(left, dp(4), edgeY);
+            drag(left, dp(12), edgeY);
             check(leftHalf.equals(bounds(left)), "Left window fills the exact left half");
             runOnMainSync(() -> home.open("@files"));
             settle();
@@ -112,7 +112,7 @@ public final class SnapSmoke extends Instrumentation {
                     "Right Explorer can take focus while left Explorer stays snapped");
 
             begin(left);
-            input(MotionEvent.ACTION_MOVE, work.centerX(), edgeY);
+            moveTo(work.centerX(), edgeY);
             settle();
             check(left.getWidth() == floating.width() && left.getHeight() == floating.height(),
                     "Dragging a snapped window restores its prior floating size during the drag");
@@ -122,14 +122,14 @@ public final class SnapSmoke extends Instrumentation {
             check(!left.geometry().has("snap") && !left.maximized(), "Free release keeps the window floating");
             Rect moved = bounds(left);
             begin(left);
-            input(MotionEvent.ACTION_MOVE, work.centerX(), work.top + dp(4));
+            moveTo(work.centerX(), work.top + dp(12));
             checkPreview(left, work, "Top outline ends above the taskbar");
             saveScreenshot("aero-snap-top-preview");
-            input(MotionEvent.ACTION_UP, work.centerX(), work.top + dp(4));
+            input(MotionEvent.ACTION_UP, work.centerX(), work.top + dp(12));
             settle();
             check(left.maximized() && work.equals(bounds(left)), "Top release maximizes within the work area");
             begin(left);
-            input(MotionEvent.ACTION_MOVE, work.centerX(), edgeY);
+            moveTo(work.centerX(), edgeY);
             settle();
             check(left.getWidth() == moved.width() && left.getHeight() == moved.height(),
                     "Dragging a maximized window restores its floating size");
@@ -153,11 +153,11 @@ public final class SnapSmoke extends Instrumentation {
             settle();
             Rect portrait = bounds(left);
             int portraitCenter = workspace.getWidth() / 2;
-            drag(left, dp(4), workspace.getHeight() / 2);
+            drag(left, dp(12), workspace.getHeight() / 2);
             boolean canSplit = workspace.getWidth() / 2 >= dp(240);
             check(left.geometry().has("snap") == canSplit, "Portrait side snap requires usable halves");
             if (!canSplit) check(left.getWidth() == portrait.width(), "Narrow portrait preserves floating size");
-            drag(left, portraitCenter, dp(4));
+            drag(left, portraitCenter, dp(12));
             check(left.maximized() && left.getWidth() == workspace.getWidth()
                     && bounds(left).bottom == workspace.getHeight(), "Top snap works in portrait");
             result.putString("stream", "PASS: Aero Snap preview, side-by-side Explorer focus, top snap, drag-away, cancel, window controls and portrait limits.\n");
@@ -203,7 +203,7 @@ public final class SnapSmoke extends Instrumentation {
 
     private void drag(DesktopWindow window, int x, int y) throws Exception {
         begin(window);
-        input(MotionEvent.ACTION_MOVE, x, y);
+        moveTo(x, y);
         input(MotionEvent.ACTION_UP, x, y);
         settle();
     }
