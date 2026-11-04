@@ -175,7 +175,7 @@ final class DesktopWindow extends LinearLayout {
                 gripY=clamp(gripY,0,Aero.dp(getContext(),48));
             }
             placement=Placement.FLOATING;
-            maximizeButton.setText("□");
+            updatePlacementButton(Placement.FLOATING);
         }
         setX(clamp(x-gripX,0,Math.max(0,hostWidth()-floatingWidth())));
         setY(clamp(y-gripY,safeTop,Math.max(safeTop,host.getHeight()-floatingHeight())));
@@ -196,12 +196,16 @@ final class DesktopWindow extends LinearLayout {
     }
 
     void cancelCaptionDrag(){
+        if(resetCaptionDrag())fitToHost();
+    }
+
+    private boolean resetCaptionDrag(){
         captionTracking=false;
-        if(!captionDragging)return;
+        if(!captionDragging)return false;
         captionDragging=false;
         placement=dragStartPlacement;
         showSnapPreview(Placement.FLOATING);
-        fitToHost();
+        return true;
     }
 
     private void showSnapPreview(Placement target){
@@ -236,13 +240,11 @@ final class DesktopWindow extends LinearLayout {
     void fitToHost(){
         if(getParent()==null)return;
         if(captionTracking&&(dragWidth!=hostWidth()||dragTop!=safeTop||dragHeight!=host.getHeight())){
-            boolean wasDragging=captionDragging;
-            cancelCaptionDrag();
-            if(wasDragging)return;
+            resetCaptionDrag();
         }
         if(captionDragging)return;
         Placement target=effectivePlacement();
-        maximizeButton.setText(target==Placement.FLOATING?"□":"❐");
+        updatePlacementButton(target);
         if(target==Placement.FLOATING){
             int width=floatingWidth(),height=floatingHeight();
             setX(positionX*Math.max(0,hostWidth()-width));
@@ -254,6 +256,11 @@ final class DesktopWindow extends LinearLayout {
             setY(bounds.top);
             resize(bounds.width(),bounds.height());
         }
+    }
+
+    private void updatePlacementButton(Placement target){
+        String symbol=target==Placement.FLOATING?"□":"❐";
+        if(!symbol.contentEquals(maximizeButton.getText()))maximizeButton.setText(symbol);
     }
 
     private void resize(int width,int height){
