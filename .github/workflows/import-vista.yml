@@ -15,4 +15,10 @@ jobs:
       - name: Import the handoff commit into the Seven repository
         run: |
           git fetch --no-tags https://github.com/bdredenbach/Windows-Vista-Style-Android-Launcher.git 7c3fd109ac1fae51486c8f645b5f7cba7370bdeb
-          git push origin FETCH_HEAD:refs/heads/feature/nth-desktop-seven
+          git switch --detach FETCH_HEAD
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/android.yml
+          git commit -m 'Prepare the pinned Vista source for the Seven workflow'
+          git merge -s ours --allow-unrelated-histories -m 'Connect the Seven repository to the pinned Vista history' "$GITHUB_SHA"
+          git push origin HEAD:refs/heads/feature/nth-desktop-seven
