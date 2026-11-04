@@ -16,6 +16,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+import java.io.FileOutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.function.Predicate;
@@ -40,6 +41,8 @@ public final class SnapSmoke extends Instrumentation {
             DesktopStore store = new DesktopStore(target);
             store.prefs.edit().putInt("startup_mode", 2).putBoolean("reduce_motion", true)
                     .putBoolean("sidebar_always_top", true).commit();
+            target.getSharedPreferences(StorageAccess.PREFS, Context.MODE_PRIVATE).edit()
+                    .putBoolean("seen", true).commit();
             target.getSharedPreferences(StartupExperience.SESSION, Context.MODE_PRIVATE).edit()
                     .putBoolean("seen", true).putBoolean("welcome_seen", true).commit();
             home = (MainActivity) startActivitySync(new Intent(Intent.ACTION_MAIN)
@@ -67,7 +70,11 @@ public final class SnapSmoke extends Instrumentation {
             int edgeY = work.centerY();
             begin(left);
             input(MotionEvent.ACTION_MOVE, dp(4), edgeY);
+            settle();
+            check(bounds(left).left == 0 && home.hasWindowFocus(),
+                    "The caption drag moves the window to the edge with the desktop focused");
             checkOutline(dp(1), work.bottom - dp(18), true, "Left outline appears at the workspace edge");
+            saveScreenshot("aero-snap-left-preview");
             checkOutline(work.right + dp(4), work.bottom - dp(18), false, "Outline clears the Sidebar");
             input(MotionEvent.ACTION_MOVE, work.centerX(), edgeY);
             checkOutline(dp(1), work.bottom - dp(18), false, "Leaving the edge clears the outline");
@@ -108,6 +115,7 @@ public final class SnapSmoke extends Instrumentation {
             begin(left);
             input(MotionEvent.ACTION_MOVE, work.centerX(), work.top + dp(4));
             checkOutline(work.centerX(), work.bottom - dp(1), true, "Top outline reaches the end of the workspace");
+            saveScreenshot("aero-snap-top-preview");
             checkOutline(work.centerX(), work.bottom + dp(4), false, "Top outline stays clear of the taskbar");
             input(MotionEvent.ACTION_UP, work.centerX(), work.top + dp(4));
             settle();
@@ -147,6 +155,7 @@ public final class SnapSmoke extends Instrumentation {
             result.putString("stream", "PASS: Aero Snap preview, side-by-side Explorer focus, top snap, drag-away, cancel, window controls and portrait limits.\n");
             status = Activity.RESULT_OK;
         } catch (Throwable failure) {
+            try { saveScreenshot("aero-snap-failure"); } catch (Exception ignored) {}
             StringWriter trace = new StringWriter();
             failure.printStackTrace(new PrintWriter(trace));
             result.putString("stream", "FAIL: " + trace);
@@ -233,6 +242,16 @@ public final class SnapSmoke extends Instrumentation {
             check(matches == expected, message + " (pixel #" + Integer.toHexString(color) + ")");
         } finally {
             screenshot.recycle();
+        }
+    }
+
+    private void saveScreenshot(String name) throws Exception {
+        Bitmap image = getUiAutomation().takeScreenshot();
+        if (image == null) return;
+        try (FileOutputStream out = getTargetContext().openFileOutput(name + ".png", Context.MODE_PRIVATE)) {
+            image.compress(Bitmap.CompressFormat.PNG, 100, out);
+        } finally {
+            image.recycle();
         }
     }
 
