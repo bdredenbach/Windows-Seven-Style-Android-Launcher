@@ -12,7 +12,7 @@ import android.widget.*;
 
 /** An optional in-launcher introduction. No boot receiver, background activity or system-boot replacement. */
 final class StartupExperience {
-    static final String SESSION="startup_session";
+    static final String SESSION="startup_session", HOME_OFFERED="home_prompt_offered";
     private final MainActivity activity;
     private final FrameLayout host;
     private final DesktopStore store;
@@ -48,10 +48,12 @@ final class StartupExperience {
             // Claim playback before showing it, so rotation, Home and process recreation cannot replay it.
             playedHere=true;welcomeChecked=false;session.edit().putBoolean("seen",true).putInt("boot",boot).putInt("runs",session.getInt("runs",0)+1).commit();show(false);watchEarlyBoot();return;
         }}
-        watchEarlyBoot();welcome(false);
+        watchEarlyBoot();finishSetup();
     }
     private void watchEarlyBoot(){if(resumed&&store.prefs.getInt("startup_mode",0)==1&&SystemClock.uptimeMillis()<bootWatchDeadline)host.postDelayed(reconsider,1000);}
-    private void welcome(boolean afterIntro){if(!resumed)return;activity.storageReady();if(welcomeChecked)return;welcomeChecked=true;if(!session.getBoolean("welcome_seen",false)||welcomeAtStart){
+    private void finishSetup(){
+        if(!resumed||!activity.hasWindowFocus()||activity.offerInitialHome(session))return;
+        activity.storageReady();if(welcomeChecked)return;welcomeChecked=true;if(!session.getBoolean("welcome_seen",false)||welcomeAtStart){
         session.edit().putBoolean("welcome_seen",true).apply();welcome.run();
     }}
     private void show(boolean preview){
@@ -76,7 +78,7 @@ final class StartupExperience {
             setOnApplyWindowInsetsListener((v,insets)->{int left=0,top=0,right=0,bottom=0;if(Build.VERSION.SDK_INT>=30){Insets safe=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());left=safe.left;top=safe.top;right=safe.right;bottom=safe.bottom;}else{left=insets.getSystemWindowInsetLeft();top=insets.getSystemWindowInsetTop();right=insets.getSystemWindowInsetRight();bottom=insets.getSystemWindowInsetBottom();}setPadding(left,top,right,bottom);return insets;});
         }
         void start(){started=SystemClock.uptimeMillis();requestApplyInsets();requestFocus();post(frame);}
-        void finish(boolean completed){if(done)return;done=true;removeCallbacks(frame);if(track!=null){try{track.stop();}catch(IllegalStateException ignored){}track.release();track=null;}host.removeView(this);intro=null;if(completed&&!preview)welcome(true);}
+        void finish(boolean completed){if(done)return;done=true;removeCallbacks(frame);if(track!=null){try{track.stop();}catch(IllegalStateException ignored){}track.release();track=null;}host.removeView(this);intro=null;if(completed&&!preview)finishSetup();}
         private boolean soundAllowed(){AudioManager audio=activity.getSystemService(AudioManager.class);NotificationManager notification=activity.getSystemService(NotificationManager.class);return store.prefs.getBoolean("startup_sound",false)&&audio!=null&&audio.getRingerMode()==AudioManager.RINGER_MODE_NORMAL&&audio.getStreamVolume(AudioManager.STREAM_SYSTEM)>0&&!audio.isMusicActive()&&(notification==null||notification.getCurrentInterruptionFilter()==NotificationManager.INTERRUPTION_FILTER_ALL);}
         private void chime(){if(!soundAllowed())return;new Thread(()->{AudioTrack created=null;try{int rate=22050;short[] pcm=new short[rate*13/10];double[] frequency={523.251,659.255,783.991,1046.502};for(int i=0;i<pcm.length;i++){double t=i/(double)rate,sample=0;for(int n=0;n<frequency.length;n++){double age=t-n*.12;if(age<0)continue;double envelope=(1-Math.exp(-age*45))*Math.exp(-age*4.5);sample+=Math.sin(2*Math.PI*frequency[n]*age)*envelope;}pcm[i]=(short)(sample*4300);}created=new AudioTrack.Builder().setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()).setAudioFormat(new AudioFormat.Builder().setSampleRate(rate).setEncoding(AudioFormat.ENCODING_PCM_16BIT).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build()).setTransferMode(AudioTrack.MODE_STATIC).setBufferSizeInBytes(pcm.length*2).build();created.write(pcm,0,pcm.length);AudioTrack sound=created;main.post(()->{if(done||!resumed||!soundAllowed()){sound.release();return;}track=sound;try{sound.setVolume(.45f);sound.play();}catch(IllegalStateException ignored){sound.release();track=null;}});}catch(RuntimeException ex){if(created!=null)created.release();}},"Nth-original-chime").start();}
     }

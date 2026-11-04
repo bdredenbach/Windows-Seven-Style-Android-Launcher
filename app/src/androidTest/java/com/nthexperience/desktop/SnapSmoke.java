@@ -49,7 +49,8 @@ public final class SnapSmoke extends Instrumentation {
             target.getSharedPreferences(StorageAccess.PREFS, Context.MODE_PRIVATE).edit()
                     .putBoolean("seen", true).commit();
             target.getSharedPreferences(StartupExperience.SESSION, Context.MODE_PRIVATE).edit()
-                    .putBoolean("seen", true).putBoolean("welcome_seen", true).commit();
+                    .putBoolean("seen", true).putBoolean("welcome_seen", true)
+                    .putBoolean(StartupExperience.HOME_OFFERED, true).commit();
             home = (MainActivity) startActivitySync(new Intent(Intent.ACTION_MAIN)
                     .setComponent(new ComponentName(target, MainActivity.class))
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));

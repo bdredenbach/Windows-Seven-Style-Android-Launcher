@@ -36,6 +36,8 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
     private boolean backupBusy,restoringBackup;
     private FrameLayout restoreCover;
     private StartupExperience startup;
+    private static final int REQUEST_HOME = 12;
+    private boolean homeRequestInFlight;
     private StorageSetup storageSetup;private boolean restoreStorageSetup;private boolean storageAllowed;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private final Handler main=new Handler(Looper.getMainLooper());
@@ -72,7 +74,10 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
 
     @Override public void onCreate(Bundle saved){
         super.onCreate(saved);store=new DesktopStore(this);storageSetup=new StorageSetup(this);storageAllowed=StorageAccess.has(this);restoreStorageSetup=saved!=null&&saved.getBoolean("storage_setup_open");layoutKey=getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE?"landscape":"portrait";
-        if(saved!=null)pendingFolderWindow=saved.getString("folder_window","@files");
+        if(saved!=null){
+            pendingFolderWindow=saved.getString("folder_window","@files");
+            homeRequestInFlight=saved.getBoolean("home_request_in_flight");
+        }
         store.migrateDesktop();
         getWindow().setStatusBarColor(Color.TRANSPARENT);getWindow().setNavigationBarColor(0xff0a263b);
         if(Build.VERSION.SDK_INT>=28){WindowManager.LayoutParams attributes=getWindow().getAttributes();attributes.layoutInDisplayCutoutMode=Build.VERSION.SDK_INT>=30?WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS:WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;getWindow().setAttributes(attributes);}
@@ -686,8 +691,35 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
     }
     @Override public void home(){
         startMenu.hide();
-        if(Build.VERSION.SDK_INT>=29){RoleManager roles=getSystemService(RoleManager.class);if(roles!=null&&roles.isRoleAvailable(RoleManager.ROLE_HOME)&&!roles.isRoleHeld(RoleManager.ROLE_HOME)){try{startActivityForResult(roles.createRequestRoleIntent(RoleManager.ROLE_HOME),12);return;}catch(ActivityNotFoundException ignored){}}}
-        launchSystem(new Intent(Settings.ACTION_HOME_SETTINGS));
+        if(!requestHome())toast("Android Home settings are unavailable on this device.");
+    }
+    boolean offerInitialHome(SharedPreferences session){
+        if(homeRequestInFlight)return true;
+        if(restoringBackup||isFinishing()||destroyed||!hasWindowFocus())return false;
+        if(session.getBoolean(StartupExperience.HOME_OFFERED,false))return false;
+        // Record the offer before leaving for Android so canceling it never causes a prompt loop.
+        session.edit().putBoolean(StartupExperience.HOME_OFFERED,true).commit();
+        return !isHome()&&requestHome();
+    }
+    private boolean requestHome(){
+        if(homeRequestInFlight)return true;
+        if(Build.VERSION.SDK_INT>=29){
+            RoleManager roles=getSystemService(RoleManager.class);
+            if(roles!=null&&roles.isRoleAvailable(RoleManager.ROLE_HOME)&&!roles.isRoleHeld(RoleManager.ROLE_HOME)){
+                if(launchHomeRequest(roles.createRequestRoleIntent(RoleManager.ROLE_HOME)))return true;
+            }
+        }
+        return launchHomeRequest(new Intent(Settings.ACTION_HOME_SETTINGS));
+    }
+    private boolean launchHomeRequest(Intent intent){
+        homeRequestInFlight=true;
+        try{
+            startActivityForResult(intent,REQUEST_HOME);
+            return true;
+        }catch(ActivityNotFoundException|SecurityException unavailable){
+            homeRequestInFlight=false;
+            return false;
+        }
     }
     @Override public boolean isHome(){
         if(Build.VERSION.SDK_INT>=29){RoleManager roles=getSystemService(RoleManager.class);if(roles!=null&&roles.isRoleAvailable(RoleManager.ROLE_HOME))return roles.isRoleHeld(RoleManager.ROLE_HOME);}
@@ -700,6 +732,12 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
     }
     @Override protected void onActivityResult(int request,int result,Intent data){
         super.onActivityResult(request,result,data);
+        if(request==REQUEST_HOME){
+            homeRequestInFlight=false;
+            if(startMenu!=null)startMenu.refreshHome();
+            if(startup!=null)root.post(startup::maybeShow);
+            return;
+        }
         if(request==PICK_MEDIA){if(result==RESULT_OK&&data!=null)importMedia(data);return;}
         if(request==305){if(result==RESULT_OK&&data!=null&&data.getData()!=null){Uri uri=data.getData();try{getContentResolver().takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(SecurityException ignored){}open("setting:page:background");DesktopWindow panel=windows.get("@control");if(panel!=null&&panel.body instanceof VistaControlPanel)((VistaControlPanel)panel.body).wallpaperChosen(uri.toString());}return;}
         if(request==304){if(result==RESULT_OK&&data!=null&&data.getData()!=null)openPhoto(data.getData(),null,"image/*",null,"@files");return;}
@@ -767,7 +805,7 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
         if(!next.equals(layoutKey)){arrangementUndo.clear();for(DesktopWindow tool:windows.values())if(tool.getParent()!=null){tool.dismissSystemMenu();tool.settle();tool.orientation(next);}layoutKey=next;desktop.orientation(next);sidebar.orientation(next);}
         if(startup!=null){startup.pause();startup.resume();}if(desktopMenu!=null)desktopMenu.dismiss();if(tray!=null)tray.dismiss();pausedSession=null;applySystemChrome();workspace.post(()->{layoutWorkspace();renderTaskbar();});
     }
-    @Override protected void onSaveInstanceState(Bundle state){super.onSaveInstanceState(state);state.putBoolean("storage_setup_open",storageSetup!=null&&storageSetup.showing());state.putString("folder_window",pendingFolderWindow);if(!restoringBackup)state.putString("desktop_session",(pausedSession==null?captureSession():pausedSession).toString());}
+    @Override protected void onSaveInstanceState(Bundle state){super.onSaveInstanceState(state);state.putBoolean("storage_setup_open",storageSetup!=null&&storageSetup.showing());state.putBoolean("home_request_in_flight",homeRequestInFlight);state.putString("folder_window",pendingFolderWindow);if(!restoringBackup)state.putString("desktop_session",(pausedSession==null?captureSession():pausedSession).toString());}
     private JSONObject captureSession(){
         JSONObject session=new JSONObject();JSONArray tools=new JSONArray();
         if(workspace==null)return session;

@@ -34,7 +34,7 @@ public class LauncherSmoke extends Instrumentation {
         Bundle result=new Bundle();String previous=null;String oldSticky=getTargetContext().getSharedPreferences("desktop",0).getString("gadget_note","");String oldGadgets=getTargetContext().getSharedPreferences("desktop",0).getString("gadgets",null);progress("runner started");
         ((Application)getTargetContext().getApplicationContext()).registerActivityLifecycleCallbacks(lifecycle);
         try {
-            getTargetContext().getSharedPreferences(StartupExperience.SESSION,0).edit().putBoolean("seen",true).putBoolean("welcome_seen",true).putInt("boot",StartupExperience.boot(getTargetContext())).commit();
+            getTargetContext().getSharedPreferences(StartupExperience.SESSION,0).edit().putBoolean("seen",true).putBoolean("welcome_seen",true).putBoolean(StartupExperience.HOME_OFFERED,true).putInt("boot",StartupExperience.boot(getTargetContext())).commit();
             migrationChecks();
             Intent launch=new Intent(Intent.ACTION_MAIN).setComponent(new ComponentName(getTargetContext(),MainActivity.class)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             progress("starting launcher activity");activity=(MainActivity)startActivitySync(launch);progress("activity started; waiting for UI idle");waitForIdleSync();root=activity.getWindow().getDecorView();

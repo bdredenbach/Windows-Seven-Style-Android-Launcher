@@ -2,6 +2,8 @@
 
 Nth Desktop Seven is a Windows 7–inspired Android home launcher. Its first test build, **0.1.0**, adds Aero Snap and installs alongside Nth Desktop Vista under the separate app ID `com.nthexperience.desktop.seven`.
 
+**0.1.1** opens Android’s default Home chooser once after the intro or as soon as the desktop is ready when the intro is off. Existing Seven 0.1.0 installs receive the offer on their next launch if Seven is still eligible.
+
 - Drag an Nth window by its title bar to the top to maximize it, or to the left or right to fill that half of the usable desktop.
 - The blue outline shows where the window will land. Drag a snapped window away by its title bar to restore its previous floating size.
 - Side snap requires 240 dp of width per window and 190 dp of usable height. The work area accounts for the taskbar, system insets and any space reserved for an always-on-top Sidebar.

@@ -23,14 +23,37 @@ public final class StorageSmoke extends ExplorerSmoke {
     @Override public void onCreate(Bundle args){own=args!=null&&"storage".equals(args.getString("suite"));if(args!=null)phase=args.getString("phase","setup");super.onCreate(args);}
     @Override public void onStart(){if(!own){super.onStart();return;}Bundle result=new Bundle();Application app=(Application)getTargetContext().getApplicationContext();app.registerActivityLifecycleCallbacks(lifecycle);try{
         DesktopStore store=new DesktopStore(getTargetContext());
+        if(phase.equals("home-upgrade")){
+            progress("checking the first Home offer on an existing Seven 0.1.0 profile");
+            SharedPreferences session=getTargetContext().getSharedPreferences(StartupExperience.SESSION,0);
+            session.edit().putBoolean("seen",true).putBoolean("welcome_seen",true).putInt("runs",1)
+                    .remove(StartupExperience.HOME_OFFERED).commit();
+            getTargetContext().getSharedPreferences(StorageAccess.PREFS,0).edit().putBoolean("seen",true).commit();
+            store.prefs.edit().putInt("startup_mode",2).putBoolean("welcome_on_start",false).commit();
+            startDesktop();
+            dismissHomeOffer(session,"home-upgrade.png");
+            await(()->home.hasWindowFocus(),"Seven returns after Cancel");
+            check(!home.isHome(),"Cancel leaves the selected Android launcher in place");
+            check(session.getInt("runs",0)==1&&node("Set up Nth Explorer")==null,"Upgrade keeps completed startup and file setup");
+            recreate(MainActivity.class);
+            await(()->home.hasWindowFocus(),"The recreated desktop remains focused");
+            check(!systemHomePrompt(),"The offer is made only once after upgrading");
+            app.unregisterActivityLifecycleCallbacks(lifecycle);
+            result.putString("stream","PASS: the first Home offer reaches existing Seven users with startup disabled, preserves their launcher after Cancel, and stays dismissed after recreation.\n");
+            finish(Activity.RESULT_OK,result);return;
+        }
         if(phase.equals("setup")){
         shell("settings put global animator_duration_scale 1");getTargetContext().getSharedPreferences(StorageAccess.PREFS,0).edit().clear().commit();store.prefs.edit().putInt("startup_mode",0).putBoolean("startup_sound",false).putBoolean("welcome_on_start",false).commit();getTargetContext().getSharedPreferences(StartupExperience.SESSION,0).edit().clear().commit();
-        progress("checking optional setup appears after the introduction and survives recreation");home=(MainActivity)startActivitySync(new Intent(Intent.ACTION_MAIN).setComponent(new ComponentName(getTargetContext(),MainActivity.class)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));current=home;root=home.getWindow().getDecorView();await(()->node("Set up Nth Explorer")!=null,"Setup follows startup");check(find("Nth startup sequence")==null&&getTargetContext().getSharedPreferences(StartupExperience.SESSION,0).getInt("runs",0)==1,"Setup appears only after the first startup presentation finishes");shot("storage-setup.png");recreate(MainActivity.class);await(()->node("Set up Nth Explorer")!=null,"Setup survives rotation/activity recreation");systemClick("Later");shell("settings put global animator_duration_scale 0");check(!StorageAccess.has(getTargetContext()),"Later does not grant permission");recreate(MainActivity.class);check(node("Set up Nth Explorer")==null,"Dismissed setup is not repeated");
+        progress("checking optional setup appears after the introduction and survives recreation");
+        startDesktop();
+        dismissHomeOffer(getTargetContext().getSharedPreferences(StartupExperience.SESSION,0),"home-first-run.png");
+        await(()->node("Set up Nth Explorer")!=null,"File setup follows the Home prompt");
+        check(!home.isHome(),"Cancel keeps the current Android launcher");check(find("Nth startup sequence")==null&&getTargetContext().getSharedPreferences(StartupExperience.SESSION,0).getInt("runs",0)==1,"Setup appears only after the first startup presentation finishes");shot("storage-setup.png");recreate(MainActivity.class);await(()->node("Set up Nth Explorer")!=null,"Setup survives rotation/activity recreation");systemClick("Later");shell("settings put global animator_duration_scale 0");check(!StorageAccess.has(getTargetContext()),"Later does not grant permission");recreate(MainActivity.class);check(node("Set up Nth Explorer")==null&&!systemHomePrompt(),"Dismissed setup and Home prompts are not repeated");
         ui(()->home.open("@computer"));await(()->explorer()!=null,"Computer opens");click("Internal storage");await(()->find("Enable device file browsing")!=null,"Denied access stays in an in-launcher setup page");check(!StorageAccess.has(getTargetContext()),"Browsing never silently grants all-files access");
 
-            app.unregisterActivityLifecycleCallbacks(lifecycle);result.putString("stream","PASS: setup follows startup, Later preserves denial, recreation restores the prompt and a choice suppresses repeats.\n");finish(Activity.RESULT_OK,result);return;
+            app.unregisterActivityLifecycleCallbacks(lifecycle);result.putString("stream","PASS: native Home prompt follows startup, Cancel preserves the current launcher, file setup follows, and completed prompts stay dismissed after recreation.\n");finish(Activity.RESULT_OK,result);return;
         }
-        getTargetContext().getSharedPreferences(StorageAccess.PREFS,0).edit().putBoolean("seen",true).commit();store.prefs.edit().putInt("startup_mode",2).putBoolean("welcome_on_start",false).commit();getTargetContext().getSharedPreferences(StartupExperience.SESSION,0).edit().putBoolean("seen",true).putBoolean("welcome_seen",true).commit();home=(MainActivity)startActivitySync(new Intent(Intent.ACTION_MAIN).setComponent(new ComponentName(getTargetContext(),MainActivity.class)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));current=home;root=home.getWindow().getDecorView();ui(()->home.open("@computer"));await(()->explorer()!=null,"Computer opens");
+        getTargetContext().getSharedPreferences(StorageAccess.PREFS,0).edit().putBoolean("seen",true).commit();store.prefs.edit().putInt("startup_mode",2).putBoolean("welcome_on_start",false).commit();getTargetContext().getSharedPreferences(StartupExperience.SESSION,0).edit().putBoolean("seen",true).putBoolean("welcome_seen",true).putBoolean(StartupExperience.HOME_OFFERED,true).commit();home=(MainActivity)startActivitySync(new Intent(Intent.ACTION_MAIN).setComponent(new ComponentName(getTargetContext(),MainActivity.class)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));current=home;root=home.getWindow().getDecorView();ui(()->home.open("@computer"));await(()->explorer()!=null,"Computer opens");
         if(phase.equals("revoked")){check(!StorageAccess.has(getTargetContext()),"Android revoked all-files access");ui(()->explorer().openDevice("internal"));await(()->find("Enable device file browsing")!=null,"Revoked storage provides a recovery page");check(!exists(StorageAccess.document("")),"Revoked direct provider reads are denied");shot("storage-revoked.png");check(node("Set up Nth Explorer")==null,"Changing access does not repeat first-run setup");app.unregisterActivityLifecycleCallbacks(lifecycle);result.putString("stream","PASS: actual all-files revocation fails closed, native reads are denied, and the launcher remains usable with recovery and individual folder access.\n");finish(Activity.RESULT_OK,result);return;}
         progress("checking Android's actual all-files grant in the disposable emulator");Intent permission=StorageAccess.settingsIntent(getTargetContext());check(permission.getAction().equals(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)&&permission.getDataString().equals("package:"+getTargetContext().getPackageName()),"The special-access request targets only Nth");await(()->StorageAccess.has(getTargetContext()),"Android reports all-files access");ui(()->explorer().openDevice("internal"));await(()->explorer().page().startsWith("folder:"),"Internal storage opens without another picker");check(DocumentsContract.getDocumentId(DocumentOps.current(explorer().page())).equals("primary:"),"Internal storage opens the shared-storage root");shot("storage-root.png");
         fixtureName="Nth-Device-Test-"+SystemClock.uptimeMillis();fixture=DocumentOps.createFolder(getTargetContext(),StorageAccess.document(""),fixtureName,new DocumentOps.Cancel());Uri source=create(fixture,"Source.txt","native device files — café 🌲"),unselected=create(fixture,"Unselected.txt","not chosen");Uri target=DocumentOps.createFolder(getTargetContext(),fixture,"Target",new DocumentOps.Cancel());DocumentOps.Ref ref=reference(source,fixture);DocumentOps.paste(getTargetContext(),Collections.singletonList(ref),target,false,new DocumentOps.Cancel(),s->{});Uri copied=StorageAccess.document(fixtureName+"/Target/Source.txt");check(Arrays.equals(bytes(source),bytes(copied)),"The existing verified copy engine works with real device files");Uri renamed=DocumentOps.rename(getTargetContext(),reference(copied,target),"Renamed.txt",new DocumentOps.Cancel());check(DocumentsContract.getDocumentId(renamed).endsWith("Renamed.txt"),"Native rename returns its updated document ID");DocumentOps.paste(getTargetContext(),Collections.singletonList(reference(renamed,target)),fixture,true,new DocumentOps.Cancel(),s->{});check(!exists(renamed)&&exists(StorageAccess.document(fixtureName+"/Renamed.txt")),"Verified cut removes only the copied native source");DocumentOps.delete(getTargetContext(),Collections.singletonList(reference(StorageAccess.document(fixtureName+"/Renamed.txt"),fixture)),new DocumentOps.Cancel());check(!exists(StorageAccess.document(fixtureName+"/Renamed.txt")),"Native delete reaches the actual file");
@@ -58,6 +81,24 @@ public final class StorageSmoke extends ExplorerSmoke {
     private void hold(View view)throws Exception{int[] xy=new int[2];view.getLocationOnScreen(xy);long down=SystemClock.uptimeMillis();inject(down,MotionEvent.ACTION_DOWN,xy[0]+view.getWidth()/2f,xy[1]+view.getHeight()/2f);Thread.sleep(700);inject(down,MotionEvent.ACTION_UP,xy[0]+view.getWidth()/2f,xy[1]+view.getHeight()/2f);}
     private void inject(long down,int action,float x,float y){MotionEvent e=MotionEvent.obtain(down,SystemClock.uptimeMillis(),action,x,y,0);e.setSource(InputDevice.SOURCE_TOUCHSCREEN);getUiAutomation().injectInputEvent(e,true);e.recycle();}
     private void back(){getUiAutomation().performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK);}
+    private void startDesktop(){
+        home=(MainActivity)startActivitySync(new Intent(Intent.ACTION_MAIN)
+                .setComponent(new ComponentName(getTargetContext(),MainActivity.class))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        current=home;root=home.getWindow().getDecorView();
+    }
+    private void dismissHomeOffer(SharedPreferences session,String screenshot)throws Exception{
+        await(this::systemHomePrompt,"Android offers to make Seven the Home app");
+        check(find("Nth startup sequence")==null,"The Home prompt follows the intro when it is enabled");
+        check(session.getBoolean(StartupExperience.HOME_OFFERED,false),"The offer is recorded before Android takes focus");
+        shot(screenshot);
+        systemClick("Cancel");
+    }
+    private boolean systemHomePrompt(){
+        AccessibilityNodeInfo active=getUiAutomation().getRootInActiveWindow();
+        CharSequence owner=active==null?null:active.getPackageName();
+        return owner!=null&&owner.toString().endsWith(".permissioncontroller");
+    }
     private AccessibilityNodeInfo node(String text){return node(getUiAutomation().getRootInActiveWindow(),text);}
     private AccessibilityNodeInfo node(AccessibilityNodeInfo node,String text){if(node==null)return null;if(text.equalsIgnoreCase(node.getText()==null?"":node.getText().toString())||text.contentEquals(node.getContentDescription()==null?"":node.getContentDescription()))return node;for(int i=0;i<node.getChildCount();i++){AccessibilityNodeInfo found=node(node.getChild(i),text);if(found!=null)return found;}return null;}
     private void systemClick(String text)throws Exception{await(()->node(text)!=null,"Dialog button: "+text);AccessibilityNodeInfo node=node(text);while(node!=null&&!node.isClickable())node=node.getParent();check(node!=null&&node.isVisibleToUser(),"Dialog action is visible");android.graphics.Rect bounds=new android.graphics.Rect();node.getBoundsInScreen(bounds);check(!bounds.isEmpty()&&bounds.width()>10&&bounds.height()>10,"Dialog action has usable screen bounds");long down=SystemClock.uptimeMillis();inject(down,MotionEvent.ACTION_DOWN,bounds.exactCenterX(),bounds.exactCenterY());Thread.sleep(70);inject(down,MotionEvent.ACTION_UP,bounds.exactCenterX(),bounds.exactCenterY());Thread.sleep(120);}

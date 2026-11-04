@@ -37,7 +37,8 @@ public final class MediaSmoke extends Instrumentation {
             store.prefs.edit().putInt("startup_mode", 2).putBoolean("welcome_on_start", false).commit();
             getTargetContext().getSharedPreferences(StorageAccess.PREFS, 0).edit().putBoolean("seen", true).commit();
             getTargetContext().getSharedPreferences(StartupExperience.SESSION, 0).edit()
-                    .putBoolean("seen", true).putBoolean("welcome_seen", true).commit();
+                    .putBoolean("seen", true).putBoolean("welcome_seen", true)
+                    .putBoolean(StartupExperience.HOME_OFFERED, true).commit();
             Uri downloads = StorageAccess.document("Download");
             folder = DocumentOps.createFolder(getTargetContext(), downloads, "Nth Media Test " + SystemClock.uptimeMillis(), new DocumentOps.Cancel());
             for (String name : Arrays.asList("Tone.mp3", "Scene.mp4", "Tone.m4a", "Tone.wav", "Tone.flac", "Scene.webm")) {
