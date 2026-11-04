@@ -7,20 +7,28 @@ import android.view.View;
 /** A small original icon family drawn with Android primitives. */
 final class AeroIcon extends View {
     private final String kind;
+    private final android.graphics.drawable.Drawable orb;
     private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-    AeroIcon(Context c, String kind) { super(c); this.kind = kind; setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO); }
+    AeroIcon(Context c, String kind) { super(c); this.kind = kind;
+        orb = kind.equals("orb") ? c.getDrawable(R.drawable.ic_launcher) : null;
+        if (orb != null) orb.setBounds(0, 0, 64, 64);
+        setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO); }
     @Override protected void onDraw(Canvas canvas) {
         float s = Math.min(getWidth()-getPaddingLeft()-getPaddingRight(),getHeight()-getPaddingTop()-getPaddingBottom())/64f;
         canvas.save(); canvas.translate((getWidth()-64*s)/2,(getHeight()-64*s)/2); canvas.scale(s,s);
         p.setShader(null); p.setStyle(Paint.Style.FILL); p.setAlpha(255);
+        if (orb != null) {
+            orb.draw(canvas);
+            canvas.restore();
+            return;
+        }
+        if (kind.equals("mediaplayer") || kind.equals("mediacenter")) {
+            mediaBadge(canvas, kind.equals("mediacenter"));
+            canvas.restore();
+            return;
+        }
         if(VistaArtwork.draw(canvas,kind)){canvas.restore();return;}
-        if (kind.equals("orb")) {
-            p.setShader(new RadialGradient(24,16,45,new int[]{0xffb9f5df,0xff237fbd,0xff071d44},null,Shader.TileMode.CLAMP));
-            canvas.drawCircle(32,32,29,p); p.setShader(null);p.setColor(0xff061a32);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2);canvas.drawCircle(32,32,29,p);p.setStyle(Paint.Style.FILL);
-            p.setColor(0xaaffffff); p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(1); canvas.drawCircle(32,32,28,p); p.setStyle(Paint.Style.FILL);
-            p.setColor(0x55ffffff); canvas.drawOval(13,8,51,28,p);
-            p.setColor(Color.WHITE); p.setTypeface(Typeface.create("sans-serif",Typeface.BOLD)); p.setTextSize(34); canvas.drawText("N",20,46,p);
-        } else if (kind.equals("computer")) {
+        if (kind.equals("computer")) {
             rounded(canvas,7,9,57,45,4,0xffc5d9e2,0xff7297ab);
             rounded(canvas,11,13,53,39,1,0xff4bb7ce,0xff133d6b);
             p.setColor(0xffbfd1dc); canvas.drawRect(27,45,37,53,p); rounded(canvas,18,52,46,56,2,0xffe3eaf0,0xff88a5b7);
@@ -114,6 +122,33 @@ final class AeroIcon extends View {
         }
         canvas.restore();
     }
+    private void mediaBadge(Canvas canvas, boolean center) {
+        p.setShader(new RadialGradient(22, 18, 47, center
+                ? new int[]{0xff8ff8ff, 0xff2783d4, 0xff102d60}
+                : new int[]{0xffffe6a9, 0xffed8b31, 0xffa43622}, null, Shader.TileMode.CLAMP));
+        canvas.drawCircle(32, 32, 26, p);
+        p.setShader(null);
+        p.setColor(0xc4f5fcff);
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(2);
+        canvas.drawCircle(32, 32, 24, p);
+        p.setStyle(Paint.Style.FILL);
+        p.setColor(0xfff5fbff);
+        if (center) {
+            for (int i = 0; i < 4; i++) {
+                float x = 19 + i % 2 * 14, y = 19 + i / 2 * 14;
+                canvas.drawRoundRect(x, y, x + 11, y + 11, 2, 2, p);
+            }
+        } else {
+            Path play = new Path();
+            play.moveTo(26, 20);
+            play.lineTo(45, 32);
+            play.lineTo(26, 44);
+            play.close();
+            canvas.drawPath(play, p);
+        }
+    }
+
     private void rounded(Canvas c,float l,float t,float r,float b,int radius,int top,int bottom) {
         p.setAlpha(255); p.setShader(new LinearGradient(0,t,0,b,top,bottom,Shader.TileMode.CLAMP)); c.drawRoundRect(l,t,r,b,radius,radius,p); p.setShader(null);
     }

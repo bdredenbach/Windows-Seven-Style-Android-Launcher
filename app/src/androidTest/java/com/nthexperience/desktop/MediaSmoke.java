@@ -11,6 +11,7 @@ import android.os.SystemClock;
 import android.provider.DocumentsContract;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.TextView;
 import androidx.media3.common.Player;
 import androidx.media3.common.util.UnstableApi;
 import java.io.*;
@@ -77,6 +78,9 @@ public final class MediaSmoke extends Instrumentation {
                 for (float sample : playback.signal.samples()) if (Math.abs(sample) > .01f) return true;
                 return false;
             }, "Visualizer receives real decoded audio");
+            MediaPanel player = (MediaPanel)find(root, view -> view instanceof MediaPanel);
+            await(() -> find(player, view -> view instanceof MediaTransportButton
+                    && "Pause".equals(view.getContentDescription())) != null, "Playing glyph has an accessible Pause action");
             shot("nth-media-player.png");
             runOnMainSync(() -> {
                 home.mediaLibrary().add(files);
@@ -84,12 +88,24 @@ public final class MediaSmoke extends Instrumentation {
                 playback.player.seekTo(3100);
             });
             await(() -> playback.player.getCurrentPosition() >= 3000, "MP3 seeks");
+            clickTab(player, "Library");
+            await(() -> find(player, view -> "Media library".equals(view.getContentDescription())) != null, "Light Library opens independently");
+            clickTab(player, "Now Playing");
             runOnMainSync(() -> home.open(MediaLibrary.CENTER));
             await(() -> find(root, view -> MediaLibrary.CENTER_TITLE.equals(view.getContentDescription())) != null,
                     "Media Center opens fullscreen");
             await(() -> !playback.player.getPlayWhenReady() && Math.abs(playback.player.getCurrentPosition() - 3100) < 300,
                     "Center keeps the exact playback session");
             shot("nth-media-center.png");
+            View center = find(root, view -> MediaLibrary.CENTER_TITLE.equals(view.getContentDescription()));
+            clickTab(center, "Start");
+            await(() -> find(center, view -> "Music".equals(view.getContentDescription())) != null, "Media Center Start exposes its Music hub");
+            shot("nth-media-center-start.png");
+            runOnMainSync(() -> find(center, view -> "Music".equals(view.getContentDescription())).performClick());
+            await(() -> find(center, view -> "Play 01 Tone.mp3".equals(view.getContentDescription())) != null,
+                    "Music opens the shared library without changing playback");
+            clickTab(center, "Now Playing");
+            await(() -> Math.abs(playback.player.getCurrentPosition() - 3100) < 300, "Changing skins preserves playback position");
 
             AtomicInteger frames = new AtomicInteger();
             runOnMainSync(() -> playback.player.addListener(new Player.Listener() {
@@ -130,6 +146,14 @@ public final class MediaSmoke extends Instrumentation {
             catch (Exception ignored) {}
         }
         finish(outcome, result);
+    }
+    private void clickTab(View panel, String label) {
+        runOnMainSync(() -> {
+            View tab = find(panel, view -> view instanceof TextView && view.isClickable()
+                    && label.contentEquals(((TextView)view).getText()));
+            check(tab != null, "Media tab is available: " + label);
+            tab.performClick();
+        });
     }
     private void await(BooleanSupplier ready, String description) throws Exception {
         long deadline = SystemClock.uptimeMillis() + 12000;

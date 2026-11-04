@@ -12,6 +12,7 @@ import android.view.View;
 
 /** Original, resolution-independent aurora artwork. No Microsoft assets. */
 final class AeroWallpaper extends View {
+    static final int SEVEN = 3;
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path path = new Path();
     private int theme;private boolean following,closed;private Bitmap photo;private int photoWidth,photoHeight,background=0xff0a263b;private String position="Fill";private android.os.CancellationSignal request;
@@ -30,6 +31,7 @@ final class AeroWallpaper extends View {
     @Override protected void onDraw(Canvas c) {
         float w = getWidth(), h = getHeight();
         if(photo!=null&&!photo.isRecycled()){drawPhoto(c,w,h);return;}
+        if(theme==SEVEN){drawSeven(c,w,h);return;}
         if(artwork!=null){
             drawArtwork(c,w,h);return;
         }
@@ -63,6 +65,33 @@ final class AeroWallpaper extends View {
         if(position.equals("Tile")){BitmapShader shader=new BitmapShader(photo,Shader.TileMode.REPEAT,Shader.TileMode.REPEAT);Matrix matrix=new Matrix();matrix.setScale(w/photo.getWidth(),h/photo.getHeight());shader.setLocalMatrix(matrix);paint.setShader(shader);canvas.drawRect(0,0,width,height,paint);paint.setShader(null);}else canvas.drawBitmap(photo,null,new RectF((width-w)/2,(height-h)/2,(width+w)/2,(height+h)/2),paint);
     }
     void close(){closed=true;if(request!=null)request.cancel();photo=null;softened=null;}
+    private void drawSeven(Canvas canvas, float width, float height) {
+        if (width <= 0 || height <= 0) return;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setAlpha(255);
+        paint.setShader(new LinearGradient(0, 0, width, height,
+                new int[]{0xff071a42, 0xff104890, 0xff0879bd, 0xff052b5a},
+                new float[]{0, .35f, .68f, 1}, Shader.TileMode.CLAMP));
+        canvas.drawRect(0, 0, width, height, paint);
+        paint.setShader(new RadialGradient(width * .79f, height * .53f, Math.max(width, height) * .63f,
+                new int[]{0xb65ce5ff, 0x3658b7ff, 0x004486cd}, null, Shader.TileMode.CLAMP));
+        canvas.drawRect(0, 0, width, height, paint);
+        paint.setShader(new LinearGradient(0, 0, width, 0,
+                new int[]{0x00a1ebff, 0xa6b5f7ff, 0x0085cfff}, null, Shader.TileMode.CLAMP));
+        paint.setStyle(Paint.Style.STROKE);
+        for (int i = 0; i < 3; i++) {
+            float lift = i * .035f;
+            path.rewind();
+            path.moveTo(-width * .11f, height * (.94f + lift));
+            path.cubicTo(width * .23f, height * (.48f + lift), width * .64f, height * (.96f + lift),
+                    width * 1.1f, height * (.38f + lift));
+            paint.setStrokeWidth(Math.max(1, Math.min(width, height) * (.0016f + i * .0009f)));
+            canvas.drawPath(path, paint);
+        }
+        paint.setShader(null);
+        paint.setStyle(Paint.Style.FILL);
+    }
+
     private void drawArtwork(Canvas c,float w,float h){
         Bitmap image=w>h&&wideArtwork!=null?wideArtwork:artwork;
         float scale=Math.max(w/image.getWidth(),h/image.getHeight());

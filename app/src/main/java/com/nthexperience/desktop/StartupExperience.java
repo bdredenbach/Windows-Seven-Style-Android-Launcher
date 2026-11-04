@@ -69,11 +69,11 @@ final class StartupExperience {
         boolean done,chimed;
         AudioTrack track;
         final Handler main=new Handler(Looper.getMainLooper());
-        final Runnable frame=new Runnable(){public void run(){if(done)return;long elapsed=SystemClock.uptimeMillis()-started;float progress=Math.min(1,elapsed/(float)duration);scene.progress=animated?progress:.75f;scene.invalidate();float text=animated?Math.max(0,Math.min(1,(progress-.58f)*5)):1;name.setAlpha(text);welcomeText.setAlpha(text);if(animated&&!chimed&&progress>=.25f){chimed=true;chime();}if(elapsed>=duration){finish(true);return;}postOnAnimation(this);}};
+        final Runnable frame=new Runnable(){public void run(){if(done)return;long elapsed=SystemClock.uptimeMillis()-started;float progress=Math.min(1,elapsed/(float)duration);scene.progress=animated?progress:1f;scene.invalidate();float text=animated?Math.max(0,Math.min(1,(progress-.58f)*5)):1;name.setAlpha(text);welcomeText.setAlpha(text);if(animated&&!chimed&&progress>=.25f){chimed=true;chime();}if(elapsed>=duration){finish(true);return;}postOnAnimation(this);}};
         Intro(boolean preview){
             super(activity);this.preview=preview;animated=Aero.motion(activity);duration=animated?3000:450;setContentDescription("Nth startup sequence");setClickable(true);setFocusableInTouchMode(true);setElevation(Aero.dp(activity,80));
             scene=new Scene(activity);addView(scene,new LayoutParams(-1,-1));
-            LinearLayout identity=Aero.column(activity);identity.setGravity(Gravity.CENTER);name=Aero.text(activity,store.prefs.getString("desktop_name",activity.getString(R.string.app_name)),23,Color.WHITE);name.setGravity(Gravity.CENTER);name.setMaxLines(2);name.setShadowLayer(Aero.dp(activity,4),0,0,0xff7ac9f2);identity.addView(name,new LinearLayout.LayoutParams(-1,-2));welcomeText=Aero.text(activity,"Welcome",16,0xffccdeec);welcomeText.setGravity(Gravity.CENTER);identity.addView(welcomeText,new LinearLayout.LayoutParams(-1,Aero.dp(activity,35)));LayoutParams text=new LayoutParams(-1,-2,Gravity.CENTER);text.topMargin=Aero.dp(activity,192);text.leftMargin=text.rightMargin=Aero.dp(activity,24);addView(identity,text);
+            LinearLayout identity=Aero.column(activity);identity.setGravity(Gravity.CENTER);name=Aero.text(activity,store.prefs.getString("desktop_name",activity.getString(R.string.app_name)),23,Color.WHITE);name.setGravity(Gravity.CENTER);name.setMaxLines(2);name.setShadowLayer(Aero.dp(activity,4),0,0,0xff7ac9f2);identity.addView(name,new LinearLayout.LayoutParams(-1,-2));welcomeText=Aero.text(activity,"Welcome",16,0xffccdeec);welcomeText.setGravity(Gravity.CENTER);identity.addView(welcomeText,new LinearLayout.LayoutParams(-1,Aero.dp(activity,35)));LayoutParams text=new LayoutParams(-1,-2,Gravity.CENTER);text.topMargin=Aero.dp(activity,84);text.leftMargin=text.rightMargin=Aero.dp(activity,24);addView(identity,text);
             TextView skip=Aero.text(activity,"Skip",14,0xffd7e9f6);skip.setGravity(Gravity.CENTER);skip.setBackground(Aero.panel(activity,0x332c536b,0x33122d42,3,0x667ca0b8));skip.setContentDescription("Skip startup");skip.setFocusable(true);skip.setOnClickListener(v->finish(true));LayoutParams lp=new LayoutParams(Aero.dp(activity,112),Aero.dp(activity,44),Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);lp.bottomMargin=Aero.dp(activity,26);addView(skip,lp);
             setOnApplyWindowInsetsListener((v,insets)->{int left=0,top=0,right=0,bottom=0;if(Build.VERSION.SDK_INT>=30){Insets safe=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());left=safe.left;top=safe.top;right=safe.right;bottom=safe.bottom;}else{left=insets.getSystemWindowInsetLeft();top=insets.getSystemWindowInsetTop();right=insets.getSystemWindowInsetRight();bottom=insets.getSystemWindowInsetBottom();}setPadding(left,top,right,bottom);return insets;});
         }
@@ -83,13 +83,83 @@ final class StartupExperience {
         private void chime(){if(!soundAllowed())return;new Thread(()->{AudioTrack created=null;try{int rate=22050;short[] pcm=new short[rate*13/10];double[] frequency={523.251,659.255,783.991,1046.502};for(int i=0;i<pcm.length;i++){double t=i/(double)rate,sample=0;for(int n=0;n<frequency.length;n++){double age=t-n*.12;if(age<0)continue;double envelope=(1-Math.exp(-age*45))*Math.exp(-age*4.5);sample+=Math.sin(2*Math.PI*frequency[n]*age)*envelope;}pcm[i]=(short)(sample*4300);}created=new AudioTrack.Builder().setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()).setAudioFormat(new AudioFormat.Builder().setSampleRate(rate).setEncoding(AudioFormat.ENCODING_PCM_16BIT).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build()).setTransferMode(AudioTrack.MODE_STATIC).setBufferSizeInBytes(pcm.length*2).build();created.write(pcm,0,pcm.length);AudioTrack sound=created;main.post(()->{if(done||!resumed||!soundAllowed()){sound.release();return;}track=sound;try{sound.setVolume(.45f);sound.play();}catch(IllegalStateException ignored){sound.release();track=null;}});}catch(RuntimeException ex){if(created!=null)created.release();}},"Nth-original-chime").start();}
     }
     private static final class Scene extends View {
-        final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
-        final AeroIcon pearl;
+        private static final int[] BLUES = {0xff54dcff, 0xff307df3, 0xff47aafa, 0xff91e9ff};
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Path flag = new Path();
+        private final Shader[] silk = new Shader[BLUES.length];
+        private final android.graphics.drawable.Drawable pearl;
+        private Shader glow;
+        private float centerX, centerY, radius;
         float progress;
-        Scene(Context c){super(c);pearl=new AeroIcon(c,"orb");setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);}
-        @Override protected void onDraw(Canvas canvas){float w=getWidth(),h=getHeight(),d=getResources().getDisplayMetrics().density,cx=w/2,cy=h/2-Aero.dp(getContext(),35),r=Math.min(Aero.dp(getContext(),78),Math.min(w,h)*.23f);canvas.drawColor(0xff02070d);float light=Math.max(0,Math.min(1,(progress-.16f)*4));paint.setShader(new RadialGradient(cx,cy,r*2.7f,new int[]{Color.argb((int)(light*105),45,147,202),0x00182a4c},null,Shader.TileMode.CLAMP));canvas.drawRect(0,0,w,h,paint);paint.setShader(null);
-            if(progress<.26f){float y=cy+r*1.7f,left=cx-66*d;paint.setColor(0xff283f36);canvas.drawRoundRect(left,y,left+132*d,y+7*d,2*d,2*d,paint);canvas.save();canvas.clipRect(left+2*d,y+2*d,left+130*d,y+5*d);float x=left-24*d+progress/.26f*180*d;paint.setColor(0xff73c75c);for(int i=0;i<3;i++)canvas.drawRect(x+i*9*d,y+2*d,x+(i*9+7)*d,y+5*d,paint);canvas.restore();}
-            if(light>0){float scale=.85f+.15f*light;int side=Math.round(r*2);pearl.layout(0,0,side,side);canvas.save();canvas.translate(cx-r*scale,cy-r*scale);canvas.scale(scale,scale);canvas.saveLayerAlpha(0,0,side,side,(int)(light*255));pearl.draw(canvas);canvas.restore();canvas.restore();}
+
+        Scene(Context context) {
+            super(context);
+            pearl = context.getDrawable(R.drawable.ic_launcher).mutate();
+            setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
+            flag.moveTo(-1, -.72f);
+            flag.cubicTo(-.28f, -1.42f, .35f, -.30f, 1, -.86f);
+            flag.lineTo(.88f, .69f);
+            flag.cubicTo(.18f, 1.39f, -.38f, .35f, -1.04f, .91f);
+            flag.close();
+            for (int i = 0; i < silk.length; i++)
+                silk[i] = new LinearGradient(-1, -1, 1, 1, 0xffe0fcff, BLUES[i], Shader.TileMode.CLAMP);
+        }
+
+        @Override protected void onSizeChanged(int width, int height, int oldWidth, int oldHeight) {
+            centerX = width / 2f;
+            centerY = height / 2f - Aero.dp(getContext(), 30);
+            radius = Math.min(Aero.dp(getContext(), 70), Math.min(width, height) * .19f);
+            if (radius <= 0) return;
+            glow = new RadialGradient(centerX, centerY, radius * 3.1f,
+                    new int[]{0xff276fbf, 0x001b448f}, null, Shader.TileMode.CLAMP);
+            pearl.setBounds(Math.round(centerX - radius), Math.round(centerY - radius),
+                    Math.round(centerX + radius), Math.round(centerY + radius));
+        }
+
+        @Override protected void onDraw(Canvas canvas) {
+            canvas.drawColor(0xff02050c);
+            if (radius <= 0) return;
+            float merge = ease((progress - .66f) / .19f);
+            float light = ease(progress / .4f);
+            paint.setShader(glow);
+            paint.setAlpha(Math.round(light * (68 + 74 * merge)));
+            canvas.drawRect(0, 0, getWidth(), getHeight(), paint);
+            paint.setShader(null);
+            if (merge < 1) for (int i = 0; i < BLUES.length; i++) {
+                float t = Math.max(0, progress - i * .026f);
+                float gather = ease(t / .78f);
+                float orbit = radius * (2.17f - 1.98f * gather);
+                float angle = i * (float) Math.PI / 2 + t * 9.5f;
+                float alpha = ease(t / .12f) * (1 - merge);
+                for (int tail = 5; tail >= 1; tail--) {
+                    float behind = angle - .12f * tail;
+                    paint.setColor(BLUES[i]);
+                    paint.setAlpha(Math.round(alpha * (100 - tail * 15)));
+                    canvas.drawCircle(centerX + (float)Math.cos(behind) * orbit,
+                            centerY + (float)Math.sin(behind) * orbit * .68f,
+                            radius * (.084f - .008f * tail), paint);
+                }
+                canvas.save();
+                canvas.translate(centerX + (float)Math.cos(angle) * orbit,
+                        centerY + (float)Math.sin(angle) * orbit * .68f);
+                canvas.rotate((float)Math.toDegrees(angle) + 54);
+                float scale = radius * (.17f + .17f * gather);
+                canvas.scale(scale, scale);
+                paint.setShader(silk[i]);
+                paint.setAlpha(Math.round(255 * alpha));
+                canvas.drawPath(flag, paint);
+                paint.setShader(null);
+                canvas.restore();
+            }
+            if (merge > 0) {
+                pearl.setAlpha(Math.round(255 * merge));
+                pearl.draw(canvas);
+            }
+        }
+
+        private static float ease(float value) {
+            float t = Math.max(0, Math.min(1, value));
+            return t * t * (3 - 2 * t);
         }
     }
 }

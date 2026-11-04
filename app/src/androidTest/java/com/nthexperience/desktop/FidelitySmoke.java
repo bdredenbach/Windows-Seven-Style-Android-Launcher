@@ -30,11 +30,47 @@ public final class FidelitySmoke extends Instrumentation {
         android.accessibilityservice.AccessibilityServiceInfo service=getUiAutomation().getServiceInfo();
         service.flags|=android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS;
         getUiAutomation().setServiceInfo(service);
-        home=(MainActivity)startActivitySync(new Intent(Intent.ACTION_MAIN).setComponent(new ComponentName(getTargetContext(),MainActivity.class)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));root=home.getWindow().getDecorView();await(()->home.hasWindowFocus(),"Focused desktop");tray();taskbarModes();binProperties();shortcutRecycle();backgrounds();graphs();folders();
-        result.putString("stream","PASS: task buttons preserve 0/50/100 glass opacity; equal Quick Launch separators; inline tray arrow and real device icons; draft-only background thumbnails, custom picture decode, Save changes and position; real PID/CPU/RAM/network graph sampling and pause/reduced motion; separate Explorer windows, taskbar family grouping, physical icon drag copy/move with exact bytes and original preservation; real folder desktop links and validated backups.\n");success=true;
+        home=(MainActivity)startActivitySync(new Intent(Intent.ACTION_MAIN).setComponent(new ComponentName(getTargetContext(),MainActivity.class)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));root=home.getWindow().getDecorView();await(()->home.hasWindowFocus(),"Focused desktop");sevenDesktop();tray();taskbarModes();binProperties();shortcutRecycle();backgrounds();graphs();folders();
+        result.putString("stream","PASS: Seven reuses pinned icon slots and exposes real Explorer Libraries; task buttons preserve 0/50/100 glass opacity; equal Quick Launch separators; inline tray arrow and real device icons; draft-only background thumbnails, custom picture decode, Save changes and position; real PID/CPU/RAM/network graph sampling and pause/reduced motion; separate Explorer windows, taskbar family grouping, physical icon drag copy/move with exact bytes and original preservation; real folder desktop links and validated backups.\n");success=true;
     }catch(Throwable error){try{shot("fidelity-failure.png");StringBuilder tree=new StringBuilder();dump(getUiAutomation().getRootInActiveWindow(),tree,0);try(FileOutputStream out=getTargetContext().openFileOutput("fidelity-tree.txt",0)){out.write(tree.toString().getBytes(StandardCharsets.UTF_8));}}catch(Exception ignored){}StringWriter text=new StringWriter();error.printStackTrace(new PrintWriter(text));result.putString("stream","FAIL: "+text);
     }finally{try{shell("settings put global animator_duration_scale 0");if(home!=null)ui(()->home.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT));if(folder!=null)delete(folder);for(JSONObject item:RecycleBin.list(getTargetContext()))if(recycleFixture!=null&&recycleFixture.equals(item.optString("shortcut")))RecycleBin.remove(getTargetContext(),item);if(store!=null){SharedPreferences.Editor edit=store.prefs.edit().clear();for(Map.Entry<String,Object> item:original.entrySet()){Object value=item.getValue();String key=item.getKey();if(value instanceof String)edit.putString(key,(String)value);else if(value instanceof Boolean)edit.putBoolean(key,(Boolean)value);else if(value instanceof Integer)edit.putInt(key,(Integer)value);else if(value instanceof Long)edit.putLong(key,(Long)value);else if(value instanceof Float)edit.putFloat(key,(Float)value);}edit.commit();}}catch(Exception ignored){}app.unregisterActivityLifecycleCallbacks(lifecycle);}
         finish(success?Activity.RESULT_OK:Activity.RESULT_CANCELED,result);
+    }
+    private void sevenDesktop() throws Exception {
+        progress("Seven icon taskbar and Explorer Libraries");
+        List<String> saved = store.quickLaunch();
+        ui(() -> {
+            store.quickLaunch(Arrays.asList("@notes", "@files", MediaLibrary.PLAYER));
+            store.prefs.edit().putBoolean("taskbar_show_labels", false).apply();
+            home.open("@notes");
+            window("@notes").closeWindow();
+        });
+        View strip = find(v -> "taskbar-items".equals(v.getTag()));
+        ViewGroup buttons = (ViewGroup) ((ViewGroup) strip).getChildAt(0);
+        await(() -> buttons.getChildCount() == 3
+                && "Open Notepad".equals(buttons.getChildAt(0).getContentDescription()), "Idle pins retain their order");
+        ui(() -> home.open("@notes"));
+        await(() -> buttons.getChildCount() == 3
+                && "Minimize Notepad".equals(buttons.getChildAt(0).getContentDescription()), "Pinned Notepad keeps one running slot");
+        ViewGroup noteButton = (ViewGroup) buttons.getChildAt(0);
+        check(noteButton.getChildAt(1).getVisibility() == View.GONE, "Seven uses icon-only buttons");
+        tap(noteButton, 60);
+        await(() -> "Restore Notepad".equals(buttons.getChildAt(0).getContentDescription()), "Pinned slot restores its running window");
+        ui(() -> {window("@notes").closeWindow(); home.open("@files");});
+        DesktopWindow files = window("@files");
+        await(() -> find(files, v -> "Navigation: Libraries".equals(v.getContentDescription())) != null, "Libraries is discoverable in the navigation pane");
+        ui(() -> find(files, v -> "Navigation: Libraries".equals(v.getContentDescription())).performClick());
+        VistaExplorer explorer = (VistaExplorer) files.body;
+        await(() -> explorer.page().equals("libraries")
+                && find(files, v -> "Videos".equals(v.getContentDescription())) != null, "Explorer displays the four native library folders");
+        shot("seven-desktop-libraries.png");
+        ui(() -> {
+            files.closeWindow();
+            store.quickLaunch(saved);
+            store.prefs.edit().putBoolean("taskbar_show_labels", true).apply();
+            home.open("@notes");
+            window("@notes").closeWindow();
+        });
     }
     private void tray()throws Exception{
         progress("task opacity, matching separators and inline tray expansion");ui(()->home.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE));await(()->root.getWidth()>root.getHeight(),"Wide tray ready");AeroWallpaper wallpaper=(AeroWallpaper)find(v->v instanceof AeroWallpaper);for(int opacity:new int[]{0,50,100}){store.prefs.edit().putBoolean("aero_transparency",true).putInt("aero_opacity",opacity).commit();for(boolean active:new boolean[]{false,true}){Bitmap bitmap=Bitmap.createBitmap(80,48,Bitmap.Config.ARGB_8888);AeroGlass surface=new AeroGlass(wallpaper,AeroGlass.TASKBUTTON);surface.active(active);surface.setBounds(0,0,80,48);ui(()->surface.draw(new Canvas(bitmap)));check(Math.abs(Color.alpha(bitmap.getPixel(40,24))-Math.round(opacity*255/100f))<=1,"Task button honors opacity for active="+active);if(opacity==0)for(int y=0;y<48;y++)for(int x=0;x<80;x++)check(bitmap.getPixel(x,y)==0,"No opaque task edges");bitmap.recycle();}}
