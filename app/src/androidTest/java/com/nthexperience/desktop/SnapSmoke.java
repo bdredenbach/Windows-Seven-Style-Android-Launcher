@@ -97,10 +97,11 @@ public final class SnapSmoke extends Instrumentation {
             runOnMainSync(() -> right.arrange(dp(28), dp(62), dp(300), dp(230)));
             settle();
             Rect rightHalf = new Rect(leftHalf.right, work.top, work.right, work.bottom);
+            int rightEdge = work.right - dp(12);
             begin(right);
-            input(MotionEvent.ACTION_MOVE, work.right - dp(4), edgeY);
+            moveTo(rightEdge, edgeY);
             checkPreview(right, rightHalf, "Right outline leaves the always-on-top Sidebar clear");
-            input(MotionEvent.ACTION_UP, work.right - dp(4), edgeY);
+            input(MotionEvent.ACTION_UP, rightEdge, edgeY);
             settle();
             check(rightHalf.equals(bounds(right)), "Right window fills the exact right half");
             tap(title(left));
@@ -175,6 +176,14 @@ public final class SnapSmoke extends Instrumentation {
                 status = Activity.RESULT_CANCELED;
             }
         }
+        if (home != null) {
+            try {
+                rotate(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+            } catch (Exception | AssertionError cleanup) {
+                result.putString("stream", result.getString("stream") + "Could not restore portrait: " + cleanup + "\n");
+                status = Activity.RESULT_CANCELED;
+            }
+        }
         finish(status, result);
     }
 
@@ -197,6 +206,16 @@ public final class SnapSmoke extends Instrumentation {
         input(MotionEvent.ACTION_MOVE, x, y);
         input(MotionEvent.ACTION_UP, x, y);
         settle();
+    }
+
+    private void moveTo(int x, int y) throws Exception {
+        int startX = pointerX, startY = pointerY;
+        for (int i = 1; i <= 6; i++) {
+            Thread.sleep(25);
+            input(MotionEvent.ACTION_MOVE, startX + (x - startX) * i / 6, startY + (y - startY) * i / 6);
+        }
+        Thread.sleep(30);
+        input(MotionEvent.ACTION_MOVE, x, y);
     }
 
     private void begin(DesktopWindow window) throws Exception {

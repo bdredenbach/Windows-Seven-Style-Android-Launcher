@@ -68,10 +68,7 @@ final class DesktopWindow extends LinearLayout {
         bindCaptionIcon(bar.getChildAt(0));
         GestureDetector captionGestures=new GestureDetector(context,new GestureDetector.SimpleOnGestureListener(){
             @Override public boolean onDown(MotionEvent e){return true;}
-            @Override public boolean onDoubleTapEvent(MotionEvent e){
-                if(e.getActionMasked()==MotionEvent.ACTION_UP&&captionTracking&&!captionDragging)toggleMaximize();
-                return true;
-            }
+            @Override public boolean onDoubleTap(MotionEvent e){toggleMaximize();return true;}
             @Override public void onLongPress(MotionEvent e){
                 if(captionTracking&&!captionDragging){
                     cancelCaptionDrag();
@@ -88,8 +85,9 @@ final class DesktopWindow extends LinearLayout {
                         return true;
                     }
                     settle();
+                    captionGestures.onTouchEvent(e);
                     beginCaptionDrag(e);
-                    break;
+                    return true;
                 case MotionEvent.ACTION_MOVE:
                     if(captionTracking)moveCaption(e);
                     break;
