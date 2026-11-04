@@ -38,7 +38,12 @@ public final class PolishSmoke extends Instrumentation {
         check(StartSearch.find(store,new ArrayList<>(),"task manager").stream().filter(r->r.id.equals("setting:open:@taskmanager")).count()==1,"Task Manager has one searchable canonical route");List<String> quick=store.quickLaunch();List<String> test=new ArrayList<>(quick);if(!test.contains("@taskmanager"))test.add("@taskmanager");store.quickLaunch(test);DesktopBackup.parse(DesktopBackup.snapshot(store).toString());store.quickLaunch(quick);close("@taskmanager");
     }
     private void windowCommands()throws Exception{
-        progress("caption double tap and shared taskbar/window menus");ui(()->home.open("@notes"));DesktopWindow notes=window("@notes");View title=find(notes,v->v.getContentDescription()!=null&&v.getContentDescription().toString().startsWith("Notepad. Drag"));boolean max=notes.maximized();doubleTap(title);await(()->notes.maximized()!=max,"Double tapping caption toggles maximize");tap(find(notes,v->"Window menu".equals(v.getContentDescription())),60);awaitNode("Restore");awaitNode("Close");shot("vista-window-menu.png");menuTap("Minimize");await(()->notes.getVisibility()!=View.VISIBLE,"Caption menu minimizes");
+        progress("caption double tap and shared taskbar/window menus");ui(()->home.open("@notes"));DesktopWindow notes=window("@notes");View title=find(notes,v->v.getContentDescription()!=null&&v.getContentDescription().toString().startsWith("Notepad. Drag"));boolean max=notes.maximized();
+        await(()->home.hasWindowFocus()&&title.isShown()&&!title.isLayoutRequested(),"Notepad caption is ready for touch");
+        doubleTap(title);
+        Thread.sleep(ViewConfiguration.getDoubleTapTimeout()+60L);
+        if(notes.maximized()==max)doubleTap(title);
+        await(()->notes.maximized()!=max,"Double tapping caption toggles maximize");tap(find(notes,v->"Window menu".equals(v.getContentDescription())),60);awaitNode("Restore");awaitNode("Close");shot("vista-window-menu.png");menuTap("Minimize");await(()->notes.getVisibility()!=View.VISIBLE,"Caption menu minimizes");
         View button=find(v->"Restore Notepad".equals(v.getContentDescription()));tap(button,700);menuTap("Restore");await(()->notes.isShown(),"Taskbar system menu restores minimized window");ui(()->home.open("@calendar"));DesktopWindow calendar=window("@calendar");tap(find(v->"Minimize Calendar".equals(v.getContentDescription())),700);menuTap("Close");await(()->calendar.getParent()==null,"Taskbar Close performs actual window cleanup");
     }
     private void arrangements()throws Exception{
