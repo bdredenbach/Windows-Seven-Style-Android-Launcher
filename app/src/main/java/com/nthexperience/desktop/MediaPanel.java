@@ -197,7 +197,13 @@ final class MediaPanel extends LinearLayout implements Player.Listener {
         return key;
     }
     private void tab(LinearLayout row, String name) {
-        navigation.put(name, control(row, name, () -> show(name)));
+        TextView tab = control(row, name, () -> show(name));
+        tab.setSingleLine(true);
+        tab.setEllipsize(TextUtils.TruncateAt.END);
+        if (center && name.equals("Now Playing")) {
+            ((LayoutParams) tab.getLayoutParams()).weight = 1.7f;
+        }
+        navigation.put(name, tab);
     }
     private void appearance() {
         Context context = getContext();

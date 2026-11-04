@@ -63,6 +63,7 @@ public final class FidelitySmoke extends Instrumentation {
         VistaExplorer explorer = (VistaExplorer) files.body;
         await(() -> explorer.page().equals("libraries")
                 && find(files, v -> "Videos".equals(v.getContentDescription())) != null, "Explorer displays the four native library folders");
+        SystemClock.sleep(250);
         shot("seven-desktop-libraries.png");
         ui(() -> {
             files.closeWindow();

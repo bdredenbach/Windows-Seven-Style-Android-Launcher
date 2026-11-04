@@ -90,6 +90,7 @@ public final class MediaSmoke extends Instrumentation {
             await(() -> playback.player.getCurrentPosition() >= 3000, "MP3 seeks");
             clickTab(player, "Library");
             await(() -> find(player, view -> "Media library".equals(view.getContentDescription())) != null, "Light Library opens independently");
+            shot("nth-media-library.png");
             clickTab(player, "Now Playing");
             runOnMainSync(() -> home.open(MediaLibrary.CENTER));
             await(() -> find(root, view -> MediaLibrary.CENTER_TITLE.equals(view.getContentDescription())) != null,
@@ -98,6 +99,11 @@ public final class MediaSmoke extends Instrumentation {
                     "Center keeps the exact playback session");
             shot("nth-media-center.png");
             View center = find(root, view -> MediaLibrary.CENTER_TITLE.equals(view.getContentDescription()));
+            await(() -> {
+                TextView tab = (TextView) find(center, view -> view instanceof TextView
+                        && "Now Playing".contentEquals(((TextView) view).getText()));
+                return tab != null && tab.getLineCount() == 1 && tab.getLayout().getEllipsisCount(0) == 0;
+            }, "The full Now Playing label fits on one line in Media Center");
             clickTab(center, "Start");
             await(() -> find(center, view -> "Music".equals(view.getContentDescription())) != null, "Media Center Start exposes its Music hub");
             shot("nth-media-center-start.png");
@@ -178,6 +184,8 @@ public final class MediaSmoke extends Instrumentation {
         return null;
     }
     private void shot(String filename) throws Exception {
+        waitForIdleSync();
+        SystemClock.sleep(250);
         Bitmap image = getUiAutomation().takeScreenshot();
         if (image == null) return;
         try (OutputStream out = getTargetContext().openFileOutput(filename, 0)) {
