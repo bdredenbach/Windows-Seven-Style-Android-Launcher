@@ -323,12 +323,9 @@ public final class SnapSmoke extends Instrumentation {
     }
 
     private void settle() throws Exception {
-        // A live gadget can keep the message queue active indefinitely.
-        // Main-thread barriers observe completed touch/layout work without waiting
-        // for all future gadget animation frames to disappear.
-        runOnMainSync(() -> {});
+        waitForIdleSync();
         Thread.sleep(100);
-        runOnMainSync(() -> {});
+        waitForIdleSync();
     }
 
     private void progress(String text){Bundle data=new Bundle();data.putString("stream","CHECK: "+text+"\n");sendStatus(0,data);}

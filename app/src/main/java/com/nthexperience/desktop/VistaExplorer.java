@@ -76,7 +76,12 @@ final class VistaExplorer extends VistaShell {
         int statusIndex=indexOfChild(status);removeView(status);detailsPane=new LinearLayout(c);detailsPane.setContentDescription("Explorer details pane");detailsPane.setGravity(Gravity.CENTER_VERTICAL);detailsPane.setPadding(dp(10),dp(3),dp(8),dp(3));detailsPane.setBackground(Aero.panel(c,0xfff4f8fd,0xffe4edf7,0,0xffc3d4e3));detailIcon=new FrameLayout(c);detailsPane.addView(detailIcon,new LayoutParams(dp(42),dp(42)));status.setSingleLine(false);status.setMaxLines(3);status.setTextSize(11);status.setBackgroundColor(Color.TRANSPARENT);detailsPane.addView(status,new LayoutParams(0,-1,1));status.setGravity(Gravity.CENTER_VERTICAL);addView(detailsPane,statusIndex,new LayoutParams(-1,dp(54)));
         enableNavigationToggle();addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{boolean wide=r-l>=dp(620);ViewGroup target=wide?location:queryParent;if(queryBox.getParent()!=target){((ViewGroup)queryBox.getParent()).removeView(queryBox);target.addView(queryBox,wide?new LayoutParams(dp(190),dp(32)):queryLayout);}detailsPane.setVisibility(b-t<dp(290)?GONE:VISIBLE);
             boolean narrow=r-l<dp(260);
-            folders.setText(narrow?"☰":"Folders");organize.setText(narrow?"⋯":"Organize ▾");views.setText(narrow?"▦":"Views ▾");
+            // TextView.setText requests another layout even when the text is unchanged.
+            // Only update labels when a corner drag crosses the compact-width limit.
+            String foldersLabel=narrow?"☰":"Folders",organizeLabel=narrow?"⋯":"Organize ▾",viewsLabel=narrow?"▦":"Views ▾";
+            if(!foldersLabel.contentEquals(folders.getText()))folders.setText(foldersLabel);
+            if(!organizeLabel.contentEquals(organize.getText()))organize.setText(organizeLabel);
+            if(!viewsLabel.contentEquals(views.getText()))views.setText(viewsLabel);
             sendTo.setVisibility(narrow?GONE:VISIBLE);
             if(previewEnabled&&((r-l>=dp(560))!=(or-ol>=dp(560))))render();
         });
