@@ -25,8 +25,12 @@ final class DesktopOrganizer extends VistaShell {
         addPrograms=command("Add programs",()->navigate("add:"+target()));commands.addView(addPrograms,new LayoutParams(-2,dp(36)));explorerChrome(this::classicMenu);enableNavigationToggle();
         addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{
             boolean narrow=r-l<dp(240);
-            folders.setText(narrow?"☰":"Folders");organize.setText(narrow?"⋯":"Organize ▾");
-            views.setText(narrow?"▦":"Views ▾");addPrograms.setText(narrow?"+":"Add programs");
+            String foldersLabel=narrow?"☰":"Folders",organizeLabel=narrow?"⋯":"Organize ▾";
+            String viewsLabel=narrow?"▦":"Views ▾",addLabel=narrow?"+":"Add programs";
+            if(!foldersLabel.contentEquals(folders.getText()))folders.setText(foldersLabel);
+            if(!organizeLabel.contentEquals(organize.getText()))organize.setText(organizeLabel);
+            if(!viewsLabel.contentEquals(views.getText()))views.setText(viewsLabel);
+            if(!addLabel.contentEquals(addPrograms.getText()))addPrograms.setText(addLabel);
             organize.setContentDescription("Organize");views.setContentDescription("Views");
             addPrograms.setContentDescription("Add programs");
         });
