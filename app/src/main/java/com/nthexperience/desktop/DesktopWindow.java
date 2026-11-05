@@ -49,7 +49,7 @@ final class DesktopWindow extends LinearLayout {
     private final int touchSlop, snapEdge, snapMinWidth, snapMinHeight;
     private final AeroGlass glass;
     private final TextView minimizeButton,closeButton;
-    private boolean active=true,minimizing;
+    private boolean active=true,minimizing,peeking;private int beforePeekAccessibility;
     private int transition;
     private DesktopContextMenu systemMenu;
     private static final int LEFT=1, RIGHT=2, TOP=4, BOTTOM=8;
@@ -77,7 +77,6 @@ final class DesktopWindow extends LinearLayout {
         maximizeButton=chrome("□",this::toggleMaximize);
         TextView close=chrome("×",this::closeWindow);closeButton=close;
         close.setTextColor(Color.WHITE);
-        close.setBackground(Aero.gloss(context,new int[]{0xffefb2a3,0xffcf6550,0xffa92d18,0xffc14f33},3,0xff64362f));
         bar.addView(minimize); bar.addView(maximizeButton); bar.addView(close);
         addView(bar,new LayoutParams(-1,Aero.dp(context,48)));
         body.setBackgroundColor(0xfff7f8f9); addView(body,new LayoutParams(-1,0,1));
@@ -162,7 +161,7 @@ final class DesktopWindow extends LinearLayout {
     boolean minimizing(){return minimizing;}
     boolean active(){return active;}
     void active(boolean value){active=value;glass.active(value);titleLabel.setTextColor(value?0xff111b22:0xff465563);titleLabel.setShadowLayer(Aero.dp(getContext(),value?6:2),0,0,value?0xffffffff:0x99ffffff);minimizeButton.setAlpha(value?1:.65f);maximizeButton.setAlpha(value?1:.65f);closeButton.setAlpha(value?1:.6f);}
-    @Override public boolean dispatchTouchEvent(MotionEvent e){if(e.getActionMasked()==MotionEvent.ACTION_DOWN&&!minimizing){bringToFront();changed.run();}return super.dispatchTouchEvent(e);}
+    @Override public boolean dispatchTouchEvent(MotionEvent e){if(peeking)return true;if(e.getActionMasked()==MotionEvent.ACTION_DOWN&&!minimizing){bringToFront();changed.run();}return super.dispatchTouchEvent(e);}
     private int cornerReach(){return Aero.dp(getContext(),22);}
     private int resizeCornerAt(float x,float y){
         if(maximized()||minimizing)return 0;
@@ -198,7 +197,21 @@ final class DesktopWindow extends LinearLayout {
                 new Rect(0,0,reach,reach),new Rect(width-reach,0,width,reach),
                 new Rect(0,height-reach,reach,height),new Rect(width-reach,height-reach,width,height)));
     }
+    boolean isPeeking(){return peeking;}
+    void peek(boolean value){
+        if(peeking==value)return;
+        peeking=value;glass.peek(value);
+        if(value){beforePeekAccessibility=getImportantForAccessibility();setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);}
+        else setImportantForAccessibility(beforePeekAccessibility);
+        invalidate();
+    }
+    void drawPreview(Canvas canvas){
+        boolean was=peeking;
+        peeking=false;glass.peek(false);
+        try{draw(canvas);}finally{peeking=was;glass.peek(was);}
+    }
     @Override protected void dispatchDraw(Canvas canvas){
+        if(peeking)return;
         super.dispatchDraw(canvas);
         if(maximized())return;
         float density=getResources().getDisplayMetrics().density;
@@ -289,9 +302,8 @@ final class DesktopWindow extends LinearLayout {
         fitToHost();
     }
     private TextView chrome(String symbol,Runnable action){
-        TextView view=Aero.button(getContext(),symbol,action);
+        TextView view=new WindowButton(getContext(),symbol,action);
         view.setTextSize(16);view.setMinHeight(0);view.setPadding(0,0,0,0);LayoutParams lp=new LayoutParams(Aero.dp(getContext(),44),Aero.dp(getContext(),44));lp.leftMargin=Aero.dp(getContext(),1);view.setLayoutParams(lp);
-        view.setBackground(Aero.gloss(getContext(),new int[]{0xbbc4deeb,0xaa8daabd,0x99738c9e,0xaab0c9d6},3,0xff627b8c));
         view.setContentDescription(symbol.equals("×")?"Close window":symbol.equals("—")?"Minimize window":"Maximize or restore window");
         return view;
     }
@@ -308,7 +320,7 @@ final class DesktopWindow extends LinearLayout {
         ((android.view.inputmethod.InputMethodManager)getContext().getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(getWindowToken(),0);
         clearFocus();
     }
-    void settle(){cancelResize();cancelCaptionDrag();transition++;animate().withEndAction(null).cancel();minimizing=false;setAlpha(1);setScaleX(1);setScaleY(1);setPivotX(getWidth()/2f);setPivotY(getHeight()/2f);}
+    void settle(){peek(false);cancelResize();cancelCaptionDrag();transition++;animate().withEndAction(null).cancel();minimizing=false;setAlpha(1);setScaleX(1);setScaleY(1);setPivotX(getWidth()/2f);setPivotY(getHeight()/2f);}
     void minimize(){dismissSystemMenu();hideKeyboard();settle();if(!Aero.motion(getContext())){setVisibility(GONE);changed.run();return;}minimizing=true;int token=++transition;setPivotX(getWidth()*.2f);setPivotY(host.getHeight()-getY()+Aero.dp(getContext(),20));changed.run();animate().scaleX(.15f).scaleY(.15f).alpha(0).setDuration(180).withEndAction(()->{if(token!=transition)return;setVisibility(GONE);settle();changed.run();}).start();}
     void restore(){boolean hidden=getVisibility()!=VISIBLE||minimizing;settle();setVisibility(VISIBLE);bringToFront();changed.run();if(hidden&&Aero.motion(getContext())){int token=++transition;setPivotX(getWidth()*.2f);setPivotY(host.getHeight()-getY()+Aero.dp(getContext(),20));setScaleX(.18f);setScaleY(.18f);setAlpha(0);animate().scaleX(1).scaleY(1).alpha(1).setDuration(190).withEndAction(()->{if(token==transition)settle();}).start();}}
     @Override protected void onDetachedFromWindow(){dismissSystemMenu();settle();super.onDetachedFromWindow();}

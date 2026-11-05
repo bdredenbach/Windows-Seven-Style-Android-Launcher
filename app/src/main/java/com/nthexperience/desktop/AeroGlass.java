@@ -13,7 +13,8 @@ final class AeroGlass extends Drawable {
     private final RectF rect=new RectF();
     private final Path clip=new Path();
     private boolean active=true;
-    private boolean stacked;
+    private boolean stacked,idle,hot,pressed,peek;
+    private int accent=0xff79c9f5;private float pointerX=-1,pointerY=-1;
     private int insetTop,progress=-2;
     private int drawableAlpha=255;
     static final int DEFAULT_OPACITY=85;
@@ -24,6 +25,11 @@ final class AeroGlass extends Drawable {
     void active(boolean value){if(active!=value){active=value;invalidateSelf();}}
     void stacked(boolean value){stacked=value;invalidateSelf();}
     void progress(int value){if(progress!=value){progress=value;invalidateSelf();}}
+    void idle(boolean value){idle=value;invalidateSelf();}
+    void accent(int color){accent=color;invalidateSelf();}
+    void hotTrack(boolean value,float x,float y){hot=value;pointerX=x;pointerY=y;invalidateSelf();}
+    void press(boolean value,float x,float y){pressed=value;pointerX=x;pointerY=y;invalidateSelf();}
+    void peek(boolean value){peek=value;invalidateSelf();}
     void insetTop(int pixels){insetTop=pixels;invalidateSelf();}
     @Override public void draw(Canvas c){
         rect.set(getBounds());rect.top+=insetTop;if(rect.isEmpty())return;float d=getCallback() instanceof View?((View)getCallback()).getResources().getDisplayMetrics().density:1;
@@ -32,7 +38,16 @@ final class AeroGlass extends Drawable {
         int opacity=transparent?Math.max(0,Math.min(100,prefs.getInt("aero_opacity",DEFAULT_OPACITY))):100;
         int alpha=Math.round(drawableAlpha*opacity/100f);if(alpha==0)return;
         // Composite the whole surface once: sampling, tint, reflection and edging share one opacity.
-        int layer=c.saveLayerAlpha(rect,alpha);clip.reset();clip.addRoundRect(rect,radius,radius,Path.Direction.CW);int save=c.save();c.clipPath(clip);
+        if(style==TASKBUTTON&&idle&&!hot&&!pressed&&progress<-1)return;
+        int layer=c.saveLayerAlpha(rect,alpha);
+        if(style==WINDOW&&peek){
+            p.setStyle(Paint.Style.STROKE);p.setShader(null);p.setStrokeWidth(2*d);p.setColor(0x996f9fbe);
+            c.drawRoundRect(rect.left+d,rect.top+d,rect.right-d,rect.bottom-d,radius,radius,p);
+            p.setStrokeWidth(d);p.setColor(0xeef3fbff);
+            c.drawRoundRect(rect.left+3*d,rect.top+3*d,rect.right-3*d,rect.bottom-3*d,radius,radius,p);
+            p.setStyle(Paint.Style.FILL);c.restoreToCount(layer);return;
+        }
+        clip.reset();clip.addRoundRect(rect,radius,radius,Path.Direction.CW);int save=c.save();c.clipPath(clip);
         p.setColor(0xff0d1e2b);p.setAlpha(255);c.drawRect(rect,p);
         if(transparent&&getCallback() instanceof View)wallpaper.drawGlass(c,(View)getCallback());
         int[] colors;
@@ -47,6 +62,13 @@ final class AeroGlass extends Drawable {
         if(style!=SIDEBAR){
             p.setShader(new LinearGradient(0,0,rect.width(),rect.height(),new int[]{0x00ffffff,0x20ffffff,0x00ffffff,0x10ffffff},new float[]{0,.23f,.45f,1},Shader.TileMode.CLAMP));
             Path beam=new Path();beam.moveTo(rect.width()*.05f,0);beam.lineTo(rect.width()*.35f,0);beam.lineTo(rect.width()*.78f,rect.height());beam.lineTo(rect.width()*.48f,rect.height());beam.close();c.drawPath(beam,p);p.setShader(null);
+        }
+        if(style==TASKBUTTON&&(hot||pressed)){
+            float x=pointerX<0?rect.centerX():Math.max(rect.left,Math.min(rect.right,pointerX));
+            float y=pointerY<0?rect.bottom:Math.max(rect.top,Math.min(rect.bottom,pointerY));
+            int bright=(accent&0x00ffffff)|((pressed?235:205)<<24);
+            p.setShader(new RadialGradient(x,y,Math.max(20*d,rect.width()*.95f),new int[]{bright,accent&0x00ffffff},null,Shader.TileMode.CLAMP));
+            c.drawRect(rect,p);p.setShader(null);
         }
         if(style==TASKBUTTON&&progress>=-1){
             p.setColor(progress<0?0xff68acd2:0xff6cc564);

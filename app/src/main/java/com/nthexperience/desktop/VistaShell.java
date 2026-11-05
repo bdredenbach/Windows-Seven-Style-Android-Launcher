@@ -54,8 +54,8 @@ abstract class VistaShell extends LinearLayout {
     final View explorerChrome(java.util.function.Consumer<String> menu){
         LinearLayout classic=new LinearLayout(getContext());classic.setBackground(Aero.panel(getContext(),0xfffcfcfc,0xffe4e8ed,0,0xffafb9c2));
         for(String label:new String[]{"File","Edit","View","Tools","Help"}){TextView item=command(label,()->menu.accept(label));item.setContentDescription(label+" menu");classic.addView(item,new LayoutParams(-2,dp(26)));}addView(classic,1,new LayoutParams(-1,dp(27)));
-        ((ViewGroup)commands.getParent()).setBackground(Aero.gloss(getContext(),new int[]{0xff567d94,0xff2d536b,0xff173e56,0xff346077},0,0xff7c9bae));folders.setTextColor(Color.WHITE);
-        for(int i=0;i<commands.getChildCount();i++)if(commands.getChildAt(i) instanceof TextView)((TextView)commands.getChildAt(i)).setTextColor(Color.WHITE);
+        ((ViewGroup)commands.getParent()).setBackground(Aero.gloss(getContext(),new int[]{0xfff6faff,0xffe7eff8,0xffd6e3f1,0xffedf4fb},0,0xffb5c8da));folders.setTextColor(0xff263f54);
+        for(int i=0;i<commands.getChildCount();i++)if(commands.getChildAt(i) instanceof TextView)((TextView)commands.getChildAt(i)).setTextColor(0xff263f54);
         for(TextView button:new TextView[]{back,forward})button.setBackground(Aero.gloss(getContext(),new int[]{0xffeaf7ff,0xffa9c9df,0xff7397b3,0xffc9e0ee},16,0xff839baa));
         return classic;
     }

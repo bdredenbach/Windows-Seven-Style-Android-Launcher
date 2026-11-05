@@ -39,7 +39,7 @@ final class ThemeProfiles {
     static JSONObject capture(DesktopStore store,String title)throws JSONException{
         JSONObject profile=new JSONObject().put("name",title.trim())
                 .put("backgrounds",new JSONArray(DesktopBackgrounds.current(store.prefs)))
-                .put("position",store.prefs.getString("wallpaper_position","Fill"));
+                .put("position",store.prefs.getString("wallpaper_position","Fill")).put(DesktopSounds.SCHEME,DesktopSounds.scheme(store));
         for(int i=0;i<SWITCHES.length;i++)profile.put(SWITCHES[i],store.prefs.getBoolean(SWITCHES[i],SWITCH_DEFAULTS[i]));
         for(int i=0;i<NUMBERS.length;i++)profile.put(NUMBERS[i],store.prefs.getInt(NUMBERS[i],DEFAULTS[i]));
         validate(profile);
@@ -59,6 +59,7 @@ final class ThemeProfiles {
         String title=profile.getString("name");
         if(title.trim().isEmpty()||title.length()>60||title.chars().anyMatch(Character::isISOControl))throw new JSONException("Enter a theme name of up to 60 characters.");
         if(!Arrays.asList(BackgroundPicker.POSITIONS).contains(profile.getString("position")))throw new JSONException("Invalid picture position.");
+        if(profile.has(DesktopSounds.SCHEME)&&(!(profile.get(DesktopSounds.SCHEME) instanceof String)||!SoundSchemes.valid(profile.getString(DesktopSounds.SCHEME))))throw new JSONException("Invalid sound scheme.");
         for(String key:SWITCHES)if(!(profile.get(key) instanceof Boolean))throw new JSONException("Invalid theme switch.");
         for(int i=0;i<NUMBERS.length;i++){
             Object value=profile.get(NUMBERS[i]);
@@ -85,7 +86,7 @@ final class ThemeProfiles {
         List<String> pictures=validate(profile);
         SharedPreferences.Editor edit=store.prefs.edit();
         DesktopBackgrounds.choose(edit,pictures,AeroWallpaper.SEVEN);
-        edit.putString("wallpaper_position",profile.getString("position"));
+        edit.putString("wallpaper_position",profile.getString("position")).putString(DesktopSounds.SCHEME,profile.optString(DesktopSounds.SCHEME,"classic"));
         for(String key:SWITCHES)edit.putBoolean(key,profile.getBoolean(key));
         for(String key:NUMBERS)edit.putInt(key,profile.getInt(key));
         edit.apply();

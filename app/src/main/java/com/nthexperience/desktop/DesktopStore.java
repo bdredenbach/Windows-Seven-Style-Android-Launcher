@@ -41,8 +41,10 @@ final class DesktopStore {
     List<String> startPins(){return list("start_pins",Arrays.asList("@browser","@notes"));}
     void startPins(List<String> ids){save("start_pins",ids);}
     List<String> recents() { return list("recents", new ArrayList<>()); }
+    List<String> taskbarOrder(){return list(TaskbarOrder.KEY,Collections.emptyList());}
+    void taskbarOrder(List<String> ids){save(TaskbarOrder.KEY,TaskbarOrder.clean(ids));}
     List<String> quickLaunch(){return list("quick_launch",Arrays.asList("@browser","@files",MediaLibrary.PLAYER));}
-    void quickLaunch(List<String> ids){save("quick_launch",ids.subList(0,Math.min(MAX_QUICK,ids.size())));}
+    void quickLaunch(List<String> ids){prefs.edit().remove(TaskbarOrder.KEY).apply();save("quick_launch",ids.subList(0,Math.min(MAX_QUICK,ids.size())));}
     JSONObject folders(){return object("app_folders");}
     JSONObject folder(String id){return folders().optJSONObject(id);}
     boolean isFolder(String id){return id!=null&&id.startsWith("folder:")&&folder(id)!=null;}

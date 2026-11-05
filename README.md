@@ -2,6 +2,16 @@
 
 Nth Desktop Seven is a Windows 7–inspired Android home launcher. Its first test build, **0.1.0**, adds Aero Snap and installs alongside Nth Desktop Vista under the separate app ID `com.nthexperience.desktop.seven`.
 
+**0.6.0** completes the Seven interaction pass:
+
+- Briefly press a taskbar icon, then drag sideways to reorder. Quick horizontal swipes still scroll, upward flicks open Jump Lists, and stationary holds show previews. Order survives restarts; Ctrl+Shift+Left/Right and accessibility actions also move icons.
+- Taskbar hot tracking uses the icon's dominant color while respecting glass opacity. Caption controls use consistent drawn glyphs, with shared Seven toolbar and menu highlights.
+- Hold the far-right Show desktop strip for temporary hollow-window Aero Peek. Release or cancel to restore contents; a short tap still toggles the desktop. Mouse hover also Peeks. Window geometry, minimized states and private-preview rules are preserved.
+- Four original offline sound schemes provide completion, error and notification cues. Test buttons preview without enabling automatic sounds. Schemes follow themes and portable theme files; older theme files remain compatible. Android silent mode, Do Not Disturb, system volume and active media are respected.
+- The Action Center flag opens a compact flyout for actual Nth file/backup notices and lost linked-folder access, with links to the full Action Center. Optional Home and file-access setup choices do not create warnings.
+
+The signed 0.6.0 APK updates the original Seven 0.5.12 installation in place. Android apps continue to open through Android; floating windows and Peek apply to Nth's built-in tools.
+
 **0.5.12** adds resizing from any corner of built-in windows. The opposite corner stays anchored and dimensions are saved for each orientation. Resizing a snapped window returns it to a floating size. Maximize and Restore retain the resized dimensions.
 
 Usage Access setup remains available during first launch, Welcome Center and Taskbar settings. Returning from Android Settings without a grant reopens the guide. Start menu rows show an icon and label.
@@ -202,7 +212,7 @@ These are native built-in desktop gadgets. This release does not yet host third-
 
 ## Install and update
 
-The supplied Seven 0.5.12 test APK uses the original `com.nthexperience.desktop.seven` identity and the recovered Seven-specific test key, matching the original builds through 0.5.2. Open **Nth Desktop Seven**, then choose it under **Android Settings → Apps → Default apps → Home app** when ready.
+The supplied Seven 0.6.0 test APK uses the original `com.nthexperience.desktop.seven` identity and the recovered Seven-specific test key, matching the original builds through 0.5.2. Open **Nth Desktop Seven**, then choose it under **Android Settings → Apps → Default apps → Home app** when ready.
 
 The later 0.5.3–0.5.11 Preview builds used `com.nthexperience.desktop.seven.preview` and a different key that is no longer available in this workspace. Version 0.5.12 cannot update that Preview install in place. Before switching, export its desktop backup through Control Panel → Backup and Restore, install 0.5.12, and restore the backup there. Keep Preview installed until the restored setup is verified. Android permissions and file access must be granted again; Recycle Bin contents and browser data are not included in desktop backups.
 

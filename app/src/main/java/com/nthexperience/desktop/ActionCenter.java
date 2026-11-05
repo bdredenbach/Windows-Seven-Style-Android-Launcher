@@ -47,7 +47,7 @@ final class ActionCenter extends LinearLayout {
         if(host.isHome())line(content,"Nth Desktop Seven is the default Home app.");
         else action(content,"Choose the default Home app…",host::home);
         if(!StorageAccess.has(getContext()))action(content,"Review device file access…",host::fileSetup);
-        int missing=missingLinks();
+        int missing=missingLinks(getContext(),store);
         if(missing>0){
             line(content,missing+" linked folder"+(missing==1?" needs":"s need")+" access again.");
             action(content,"Review linked folders in Computer",()->host.open("@computer"));
@@ -88,15 +88,29 @@ final class ActionCenter extends LinearLayout {
         ScrollView scroll=new ScrollView(getContext());scroll.addView(recorder.review(getContext()));
         Aero.dialog(getContext()).setTitle("Recorded steps").setView(scroll).setPositiveButton("Close",null).show();
     }
-    private int missingLinks(){
+    static final class Alert {
+        final String title,message,target;
+        Alert(String title,String message,String target){this.title=title;this.message=message;this.target=target;}
+    }
+    static java.util.List<Alert> alerts(Context context,DesktopStore store){
+        java.util.List<Alert> result=new java.util.ArrayList<>();
+        int missing=missingLinks(context,store);
+        if(missing>0)result.add(new Alert("Folder access",missing+" linked folder"+(missing==1?" needs":"s need")+" access again.","@computer"));
+        android.content.SharedPreferences saved=context.getSharedPreferences("seven_action_center",Context.MODE_PRIVATE);
+        String files=saved.getString("files",""),backup=saved.getString("backup","");
+        if(!files.isEmpty())result.add(new Alert("Nth Explorer",files,"@files"));
+        if(!backup.isEmpty())result.add(new Alert("Backup and Restore",backup,"@backup"));
+        return result;
+    }
+    private static int missingLinks(Context context,DesktopStore store){
         Set<Uri> allowed=new HashSet<>();
-        for(UriPermission permission:getContext().getContentResolver().getPersistedUriPermissions())
+        for(UriPermission permission:context.getContentResolver().getPersistedUriPermissions())
             if(permission.isReadPermission())allowed.add(permission.getUri());
         JSONArray roots=DocumentFolders.links(store);
         int missing=0;
         for(int i=0;i<roots.length();i++){
             JSONObject item=roots.optJSONObject(i);
-            if(item!=null&&!allowed.contains(Uri.parse(item.optString("uri"))))missing++;
+            if(item!=null){Uri uri=Uri.parse(item.optString("uri"));if(!allowed.contains(uri)&&!(StorageAccess.ours(uri)&&StorageAccess.has(context)))missing++;}
         }
         return missing;
     }
