@@ -172,8 +172,10 @@ public final class SnapSmoke extends Instrumentation {
                 check(title(left).getWidth()>=dp(20)&&title(right).getWidth()>=dp(20),"Both portrait halves retain a usable title grip");
             }
             drag(left, portraitCenter, dp(12));
+            long topReady=SystemClock.uptimeMillis()+4000;
+            while(!(left.maximized()&&left.getWidth()==workspace.getWidth()&&bounds(left).bottom==workspace.getHeight())&&SystemClock.uptimeMillis()<topReady)Thread.sleep(40);
             check(left.maximized() && left.getWidth() == workspace.getWidth()
-                    && bounds(left).bottom == workspace.getHeight(), "Top snap works in portrait");
+                    && bounds(left).bottom == workspace.getHeight(), "Top snap works in portrait; actual="+bounds(left)+", geometry="+left.geometry());
             shake(left);
             check(left.isShown()&&!right.isShown(),"Aero Shake minimizes the other visible window");
             shake(left);
