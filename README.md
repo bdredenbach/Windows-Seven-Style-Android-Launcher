@@ -11,7 +11,7 @@ Usage Access setup remains available during first launch, Welcome Center and Tas
 **0.5.0** adds phone-width Aero Snap, title-bar Aero Shake, Jump Lists, media controls on previews, taskbar progress, multi-folder Libraries, Explorer previews, portable My Themes, and a tray Action Center with Steps Recorder.
 
 - Drag a title bar to a side edge, or use **Window menu → Snap left / Snap right**. The Super key and arrow keys provide keyboard Snap where Android passes the shortcut through.
-- Swipe up on a taskbar button, right-click it, or choose the Start-menu arrow to open a Jump List. Hold the taskbar button for window previews.
+- Swipe up on a taskbar button or right-click it to open a Jump List. Hold the taskbar button for window previews.
 - In Explorer, use **Include in library…** on a folder, then **Manage library locations…** to choose the default save location. The Preview Pane button or **Alt+P** opens image and text previews.
 - Open **Personalization → My Themes** to save the current look and export an Nth theme with its pictures. Open the tray flag to review launcher alerts or export an opt-in Steps Recorder report.
 
@@ -202,7 +202,9 @@ These are native built-in desktop gadgets. This release does not yet host third-
 
 ## Install and update
 
-Install the supplied test APK, then open **Nth Desktop**. Try it before choosing **Make home**. To switch back: **Android Settings → Apps → Default apps → Home app**. The 0.16.0 handoff APK uses the same preserved test signing key as the earlier supplied builds, so it can be installed as an update.
+The supplied Seven 0.5.12 test APK uses the original `com.nthexperience.desktop.seven` identity and the recovered Seven-specific test key, matching the original builds through 0.5.2. Open **Nth Desktop Seven**, then choose it under **Android Settings → Apps → Default apps → Home app** when ready.
+
+The later 0.5.3–0.5.11 Preview builds used `com.nthexperience.desktop.seven.preview` and a different key that is no longer available in this workspace. Version 0.5.12 cannot update that Preview install in place. Before switching, export its desktop backup through Control Panel → Backup and Restore, install 0.5.12, and restore the backup there. Keep Preview installed until the restored setup is verified. Android permissions and file access must be granted again; Recycle Bin contents and browser data are not included in desktop backups.
 
 Notes, selected photo references, linked folder references, file-manager shortcuts, preferences and cached forecasts are stored locally. Photo access uses the document picker's retained grants; device-wide shared-file browsing is an optional separate all-files grant. Approximate location is requested when you tap **Use my approximate location** or enable **Follow my location**. A city can be chosen without granting location access. Forecasts require Internet access; city search uses Photon/OSM. City search text is sent to that service. Selected weather coordinates are sent to MET Norway. Uninstalling clears local app data.
 

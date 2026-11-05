@@ -295,7 +295,16 @@ public final class FidelitySmoke extends Instrumentation {
     private void clickPicker(View picker,String description)throws Exception{
         Predicate<View> matches=v->description.equals(v.getContentDescription());
         await(()->{View target=find(picker,matches);return target!=null&&target.isEnabled();},"Explorer target: "+description);
-        ui(()->check(find(picker,matches).performClick(),"Click Explorer target: "+description));
+        java.util.concurrent.atomic.AtomicBoolean clicked=new java.util.concurrent.atomic.AtomicBoolean();
+        ui(()->{
+            View target=find(picker,matches);
+            if(target instanceof CheckBox){
+                boolean checked=((CheckBox)target).isChecked();
+                target.performClick();
+                clicked.set(((CheckBox)target).isChecked()!=checked);
+            }else if(target!=null)clicked.set(target.performClick());
+        });
+        check(clicked.get(),"Click Explorer target: "+description);
     }
     private void graphs()throws Exception{
         progress("real monitor metrics, animated interpolation, reduced motion and pause");ui(()->home.open("@taskmanager"));TaskManagerPanel panel=(TaskManagerPanel)window("@taskmanager").body;tap(find(panel,v->"Task Manager Performance".equals(v.getContentDescription())),60);int count=panel.sampleCount();await(()->panel.sampleCount()>count,"Actual CPU/memory sampling advances");check(panel.animatedGraphCount()==0,"Reduced motion leaves graph static");shell("settings put global animator_duration_scale 1");store.prefs.edit().putBoolean("reduce_motion",false).commit();await(()->panel.animatedGraphCount()>0,"Real samples animate with motion enabled");shot("vista-taskmanager-graphs.png");tap(text(panel,"View"),60);menuTap("Pause updates");int paused=panel.sampleCount();Thread.sleep(2300);check(paused==panel.sampleCount()&&panel.animatedGraphCount()==0,"Paused counters and animations stop");tap(find(panel,v->"Task Manager Processes".equals(v.getContentDescription())),60);check(find(panel,v->v instanceof TextView&&((TextView)v).getText().toString().contains("PID "+android.os.Process.myPid()))!=null,"Real process PID is shown");tap(find(panel,v->"Task Manager Networking".equals(v.getContentDescription())),60);check(find(panel,v->"Device received traffic history".equals(v.getContentDescription()))!=null,"Native network graph exists");close("@taskmanager");store.prefs.edit().putBoolean("reduce_motion",true).commit();shell("settings put global animator_duration_scale 0");
