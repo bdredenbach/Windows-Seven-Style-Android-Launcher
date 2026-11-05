@@ -52,10 +52,12 @@ public final class SnapSmoke extends Instrumentation {
             target.getSharedPreferences(StartupExperience.SESSION, Context.MODE_PRIVATE).edit()
                     .putBoolean("seen", true).putBoolean("welcome_seen", true)
                     .putBoolean(StartupExperience.HOME_OFFERED, true).commit();
+            progress("launching Seven for native Snap checks");
             home = (MainActivity) startActivitySync(new Intent(Intent.ACTION_MAIN)
                     .setComponent(new ComponentName(target, MainActivity.class))
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             root = home.getWindow().getDecorView();
+            progress("laying out Explorer in landscape");
             rotate(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
             runOnMainSync(() -> home.open("@computer"));
             settle();
@@ -75,6 +77,7 @@ public final class SnapSmoke extends Instrumentation {
             Rect floating = bounds(left);
             int edgeY = work.centerY();
             Rect leftHalf = new Rect(0, work.top, work.right / 2, work.bottom);
+            progress("dragging and cancelling the left Snap preview");
             begin(left);
             moveTo(dp(12), edgeY);
             settle();
@@ -90,6 +93,7 @@ public final class SnapSmoke extends Instrumentation {
             check(floating.equals(bounds(left)), "Cancel restores the original floating bounds");
             checkPreview(left, null, "Cancel removes the outline");
 
+            progress("snapping both Explorer windows side by side");
             drag(left, dp(12), edgeY);
             check(leftHalf.equals(bounds(left)), "Left window fills the exact left half");
             runOnMainSync(() -> home.open("@files"));
@@ -147,6 +151,7 @@ public final class SnapSmoke extends Instrumentation {
             doubleTap(title(left));
             check(moved.equals(bounds(left)), "Title-bar double-tap restores");
 
+            progress("checking portrait Snap, Shake and keyboard controls");
             rotate(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
             runOnMainSync(() -> sidebar.visible(false));
             settle();
@@ -318,10 +323,15 @@ public final class SnapSmoke extends Instrumentation {
     }
 
     private void settle() throws Exception {
-        waitForIdleSync();
+        // A live gadget can keep the message queue active indefinitely.
+        // Main-thread barriers observe completed touch/layout work without waiting
+        // for all future gadget animation frames to disappear.
+        runOnMainSync(() -> {});
         Thread.sleep(100);
-        waitForIdleSync();
+        runOnMainSync(() -> {});
     }
+
+    private void progress(String text){Bundle data=new Bundle();data.putString("stream","CHECK: "+text+"\n");sendStatus(0,data);}
 
     private int dp(int value) { return Aero.dp(home, value); }
 

@@ -168,7 +168,7 @@ public final class StorageSmoke extends ExplorerSmoke {
     }
 
     private void resizeWindow()throws Exception{
-        progress("dragging two corners and restoring the window's saved size");
+        progress("dragging all four corners and restoring the window's saved size");
         DesktopWindow computer=(DesktopWindow)find(root,v->v instanceof DesktopWindow&&"@computer".equals(((DesktopWindow)v).toolId));
         check(computer!=null,"Explorer window is visible");
         await(()->home.hasWindowFocus()&&computer.getWidth()>0&&computer.getHeight()>0,"Explorer window is laid out before the corner drag");
