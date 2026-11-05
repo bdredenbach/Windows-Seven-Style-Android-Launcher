@@ -206,7 +206,7 @@ public final class StorageSmoke extends ExplorerSmoke {
         view.getLocationOnScreen(xy);
         return new Rect(xy[0],xy[1],xy[0]+view.getWidth(),xy[1]+view.getHeight());
     }
-    private void dragCorner(Rect bounds,boolean left,boolean top,int dx,int dy){
+    private void dragCorner(Rect bounds,boolean left,boolean top,int dx,int dy)throws Exception{
         int inset=Aero.dp(home,4);
         float x=left?bounds.left+inset:bounds.right-inset;
         float y=top?bounds.top+inset:bounds.bottom-inset;
@@ -217,6 +217,11 @@ public final class StorageSmoke extends ExplorerSmoke {
             inject(down,MotionEvent.ACTION_MOVE,x+dx*i/4f,y+dy*i/4f);
         }
         inject(down,MotionEvent.ACTION_UP,x+dx,y+dy);
+        // Injecting UP waits for input dispatch, not the following layout frame.
+        // Read the final anchored bounds after layout and accessibility settle.
+        waitForIdleSync();
+        getUiAutomation().waitForIdle(100,3000);
+        waitForIdleSync();
     }
 
     private Uri create(Uri parent,String name,String text)throws Exception{Uri uri=DocumentsContract.createDocument(getTargetContext().getContentResolver(),parent,"text/plain",name);check(uri!=null,"A native fixture is created");try(OutputStream out=getTargetContext().getContentResolver().openOutputStream(uri)){out.write(text.getBytes(java.nio.charset.StandardCharsets.UTF_8));}return uri;}
