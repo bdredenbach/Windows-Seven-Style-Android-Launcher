@@ -294,7 +294,19 @@ public final class FidelitySmoke extends Instrumentation {
     }
     private void clickPicker(View picker,String description)throws Exception{
         Predicate<View> matches=v->description.equals(v.getContentDescription());
-        await(()->{View target=find(picker,matches);return target!=null&&target.isEnabled();},"Explorer target: "+description);
+        long[] nextScroll={0};
+        await(()->{
+            View target=find(picker,matches);
+            if(target!=null&&target.isEnabled())return true;
+            // ListView creates only visible rows. The portrait Preview Pane makes
+            // the listing shorter, so move through it as a user would.
+            if(SystemClock.uptimeMillis()>=nextScroll[0]){
+                View list=find(picker,v->v instanceof android.widget.AbsListView);
+                if(list!=null)list.performAccessibilityAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD,null);
+                nextScroll[0]=SystemClock.uptimeMillis()+350;
+            }
+            return false;
+        },"Explorer target: "+description);
         java.util.concurrent.atomic.AtomicBoolean clicked=new java.util.concurrent.atomic.AtomicBoolean();
         ui(()->{
             View target=find(picker,matches);
