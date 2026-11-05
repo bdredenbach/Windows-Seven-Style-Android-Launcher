@@ -58,6 +58,10 @@ adb shell pm clear "$launcher"
 run_check resize-test.txt timeout -k 3s 100s adb shell am instrument -w -e suite storage -e phase resize "$runner".StorageSmoke
 adb shell pm clear "$launcher"
 run_check seven-polish-test.txt timeout -k 3s 110s adb shell am instrument -w "$runner".SevenPolishSmoke
+# Preserve the new suite's screenshots before clearing its isolated preferences/files.
+for name in seven-taskbar-order seven-touch-peek seven-sound-schemes seven-action-center seven-polish-failure; do
+  adb exec-out run-as "$launcher" cat "files/$name.png" > "screenshots/$name.png" 2>/dev/null || rm -f "screenshots/$name.png"
+done
 adb shell pm clear "$launcher"
 adb shell pm list instrumentation | tee instrumentation-test.txt
 grep -q 'com.nthexperience.desktop.AuthenticitySmoke' instrumentation-test.txt

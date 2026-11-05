@@ -164,7 +164,7 @@ public final class SevenPolishSmoke extends Instrumentation {
     private void settle(){waitForIdleSync();SystemClock.sleep(220);}
     private void ui(Runnable task){final Throwable[] error={null};runOnMainSync(()->{try{task.run();}catch(Throwable ex){error[0]=ex;}});if(error[0]!=null)throw new AssertionError("UI check",error[0]);waitForIdleSync();}
     private void await(BooleanSupplier value,String message)throws Exception{long end=SystemClock.uptimeMillis()+6500;while(SystemClock.uptimeMillis()<end){if(value.getAsBoolean())return;SystemClock.sleep(70);}throw new AssertionError(message);}
-    private void shot(String name)throws Exception{Bitmap bitmap=getUiAutomation().takeScreenshot();check(bitmap!=null,"Screenshot exists");try(FileOutputStream out=getTargetContext().openFileOutput(name+".png",0)){bitmap.compress(Bitmap.CompressFormat.PNG,100,out);}finally{bitmap.recycle();}}
+    private void shot(String name)throws Exception{final Bitmap[] rendered={null};ui(()->rendered[0]=draw(root));Bitmap bitmap=rendered[0];check(bitmap!=null,"Native app render exists");try(FileOutputStream out=getTargetContext().openFileOutput(name+".png",0)){bitmap.compress(Bitmap.CompressFormat.PNG,100,out);}finally{bitmap.recycle();}}
     private void progress(String message){Bundle update=new Bundle();update.putString("stream","CHECK: "+message+"\n");sendStatus(1,update);}
     private void check(boolean value,String message){if(!value)throw new AssertionError(message);}
 }
