@@ -140,7 +140,8 @@ public final class SevenPolishSmoke extends Instrumentation {
         await(()->find(root,v->"Action Center flyout".equals(v.getContentDescription()))!=null,"Flag opens compact flyout");
         check(find(root,v->v instanceof TextView&&"No recent Nth alerts.".contentEquals(((TextView)v).getText()))!=null,"Quiet flyout has no fake warnings");
         ui(home::onBackPressed);
-        ActionCenter.notice(context,"files","A test folder could not be read.");tap(flag,50);
+        ActionCenter.notice(context,"files","A test folder could not be read.");
+        await(()->"1 Nth alert".equals(flag.getStateDescription()),"Tray flag updates when a real alert arrives");tap(flag,50);
         await(()->find(root,v->"Review Nth Explorer".equals(v.getContentDescription()))!=null,"A recorded file issue is actionable");shot("seven-action-center");
         View full=find(root,v->"Open Action Center".equals(v.getContentDescription()));ui(full::performClick);
         await(()->window("@actioncenter")!=null,"Flyout routes to the full Action Center");
@@ -156,8 +157,8 @@ public final class SevenPolishSmoke extends Instrumentation {
         ui(()->home.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT));
         await(()->root.getHeight()>root.getWidth(),"Portrait layout settles");settle();
         View peek=showDesktop(),strip=find(root,v->"taskbar-items".equals(v.getTag()));
-        int[] rootAt=new int[2],peekAt=new int[2];root.getLocationOnScreen(rootAt);peek.getLocationOnScreen(peekAt);
-        check(peekAt[0]>=rootAt[0]&&peekAt[0]+peek.getWidth()<=rootAt[0]+root.getWidth(),"Full Peek touch target stays inside portrait bounds");
+        await(()->{int[] rootAt=new int[2],peekAt=new int[2];root.getLocationOnScreen(rootAt);peek.getLocationOnScreen(peekAt);return peekAt[0]>=rootAt[0]&&peekAt[0]+peek.getWidth()<=rootAt[0]+root.getWidth();},"Full Peek touch target stays inside portrait bounds");
+        shot("seven-portrait-tray");
         check(peek.getWidth()>=dp(32)&&strip.getWidth()>0,"Expanded tray leaves a usable Peek target and a scrolling task area");
         View tray=find(root,v->v instanceof SystemTray);for(int i=0;i<((ViewGroup)tray).getChildCount();i++){View icon=((ViewGroup)tray).getChildAt(i);if(icon.isShown())check(bounds(icon).width()>=dp(24),"Tray controls keep their touch width");}
     }
