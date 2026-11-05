@@ -118,6 +118,36 @@ final class WindowPreviews {
             return false;
         });
     }
+    private void addMediaControls(LinearLayout card,MediaPlayback playback,List<Runnable> refresh){
+        Context context=card.getContext();
+        LinearLayout row=new LinearLayout(context);
+        row.setGravity(Gravity.CENTER);
+        TextView previous=Aero.button(context,"◀◀",()->playback.player.seekToPreviousMediaItem());
+        previous.setContentDescription("Previous track");
+        TextView play=Aero.button(context,"▶",playback::playPause);
+        TextView next=Aero.button(context,"▶▶",()->playback.player.seekToNextMediaItem());
+        next.setContentDescription("Next track");
+        for(TextView button:new TextView[]{previous,play,next}){
+            button.setMinHeight(0);button.setPadding(0,0,0,0);
+            row.addView(button,new LinearLayout.LayoutParams(0,-1,1));
+        }
+        card.addView(row,new LinearLayout.LayoutParams(-1,Aero.dp(context,34)));
+        Runnable update=()->{
+            boolean ready=!playback.released&&playback.current()!=null;
+            previous.setEnabled(ready&&playback.player.hasPreviousMediaItem());
+            next.setEnabled(ready&&playback.player.hasNextMediaItem());
+            play.setEnabled(ready);
+            boolean playing=ready&&playback.player.getPlayWhenReady()
+                    &&playback.player.getPlaybackState()!=androidx.media3.common.Player.STATE_ENDED;
+            String description=playing?"Pause playback":"Play media";
+            if(!description.equals(play.getContentDescription())){
+                play.setText(playing?"Ⅱ":"▶");
+                play.setContentDescription(description);
+            }
+        };
+        update.run();refresh.add(update);
+    }
+
     private void showCards(View anchor,List<Card> cards,String group,boolean sticky,Runnable commands){
         if(!anchor.isAttachedToWindow()||cards.isEmpty()||!sticky&&(!activity.hasWindowFocus()
                 ||folderPicker!=null&&folderPicker.isFocusable()))return;
@@ -129,7 +159,9 @@ final class WindowPreviews {
         if(safe.width()<Aero.dp(context,110))return;
         int cardWidth=Math.min(Aero.dp(context,190),(safe.width()-4*gap)/Math.min(2,cards.size()));
         int width=Math.min(safe.width()-2*gap,cards.size()*(cardWidth+gap)+gap);
-        int height=Aero.dp(context,sticky?179:149);
+        boolean mediaControls=false;
+        for(Card card:cards)if(card.source instanceof DesktopWindow&&((DesktopWindow)card.source).body instanceof MediaPanel)mediaControls=true;
+        int height=Aero.dp(context,(sticky?179:149)+(mediaControls?36:0));
         LinearLayout shell=Aero.column(context);
         shell.setContentDescription(group==null?(cards.size()>1?"Browser tab previews":"Window preview for "+cards.get(0).title):group);
         shell.setBackground(Aero.gloss(context,new int[]{0xff6088ab,0xff365a7c,0xff183c5d},6,0xff9dbbd0));
@@ -143,6 +175,7 @@ final class WindowPreviews {
         LinearLayout row=new LinearLayout(context);row.setPadding(gap,gap,0,gap);
         scroll.addView(row,new HorizontalScrollView.LayoutParams(-2,-1));
         Map<Card,ImageView> images=new LinkedHashMap<>();
+        List<Runnable> refreshControls=new ArrayList<>();
         for(Card target:cards){
             LinearLayout card=Aero.column(context);Aero.pad(card,4);
             card.setFocusable(true);card.setContentDescription("Switch to "+target.title);
@@ -170,6 +203,10 @@ final class WindowPreviews {
                 images.put(target,image);
             }
             card.addView(body,new LinearLayout.LayoutParams(-1,0,1));
+            if(target.source instanceof DesktopWindow&&((DesktopWindow)target.source).body instanceof MediaPanel){
+                MediaPlayback playback=((MediaPanel)((DesktopWindow)target.source).body).playback();
+                addMediaControls(card,playback,refreshControls);
+            }
             card.setOnClickListener(v->{dismiss();target.open.run();});
             card.setOnHoverListener((v,event)->{
                 boolean over=event.getActionMasked()!=MotionEvent.ACTION_HOVER_EXIT;
@@ -199,6 +236,7 @@ final class WindowPreviews {
         picker.setElevation(Aero.dp(context,8));
         Runnable refresh=new Runnable(){@Override public void run(){
             if(folderPicker!=picker||!picker.isShowing())return;
+            for(Runnable controls:refreshControls)controls.run();
             for(Map.Entry<Card,ImageView> entry:images.entrySet()){
                 Card target=entry.getKey();View source=target.source;ImageView image=entry.getValue();
                 if(source instanceof DesktopWindow&&!allowed((DesktopWindow)source)){picker.dismiss();return;}

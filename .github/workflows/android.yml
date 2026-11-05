@@ -32,7 +32,7 @@ jobs:
       - name: Check launcher state and layout geometry
         run: |
           mkdir -p build/state-check
-          javac -d build/state-check app/src/main/java/com/nthexperience/desktop/LauncherState.java checks/LauncherStateCheck.java app/src/main/java/com/nthexperience/desktop/DesktopGeometry.java checks/DesktopGeometryCheck.java app/src/main/java/com/nthexperience/desktop/StartupPolicy.java checks/StartupPolicyCheck.java app/src/main/java/com/nthexperience/desktop/GadgetMath.java checks/GadgetMathCheck.java app/src/main/java/com/nthexperience/desktop/BrowserUrls.java checks/BrowserUrlsCheck.java app/src/main/java/com/nthexperience/desktop/DesktopMetrics.java checks/DesktopMetricsCheck.java app/src/main/java/com/nthexperience/desktop/ControlPanelCatalog.java checks/ControlPanelCatalogCheck.java app/src/main/java/com/nthexperience/desktop/WindowArrangement.java checks/WindowArrangementCheck.java app/src/main/java/com/nthexperience/desktop/TaskbarGrouping.java checks/TaskbarGroupingCheck.java
+          javac -d build/state-check app/src/main/java/com/nthexperience/desktop/LauncherState.java checks/LauncherStateCheck.java app/src/main/java/com/nthexperience/desktop/DesktopGeometry.java checks/DesktopGeometryCheck.java app/src/main/java/com/nthexperience/desktop/StartupPolicy.java checks/StartupPolicyCheck.java app/src/main/java/com/nthexperience/desktop/GadgetMath.java checks/GadgetMathCheck.java app/src/main/java/com/nthexperience/desktop/BrowserUrls.java checks/BrowserUrlsCheck.java app/src/main/java/com/nthexperience/desktop/DesktopMetrics.java checks/DesktopMetricsCheck.java app/src/main/java/com/nthexperience/desktop/ControlPanelCatalog.java checks/ControlPanelCatalogCheck.java app/src/main/java/com/nthexperience/desktop/AeroSnap.java app/src/main/java/com/nthexperience/desktop/WindowArrangement.java checks/WindowArrangementCheck.java app/src/main/java/com/nthexperience/desktop/TaskbarGrouping.java app/src/main/java/com/nthexperience/desktop/TaskbarFlick.java checks/TaskbarGroupingCheck.java
           java -cp build/state-check LauncherStateCheck
           java -cp build/state-check DesktopGeometryCheck
           java -cp build/state-check StartupPolicyCheck
@@ -57,7 +57,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: matrix.api == 30
         with:
-          name: Nth-Desktop-Seven-0.4.1-debug
+          name: Nth-Desktop-Seven-0.5.12-debug
           path: app/build/outputs/apk/debug/app-debug.apk
       - name: Keep APK verification tool for the handoff
         if: matrix.api == 30
@@ -108,6 +108,7 @@ jobs:
             public-service-checks.json
             side-by-side-test.txt
             snap-test.txt
+            resize-test.txt
             smoke-test.txt
             aero-test.txt
             gadgets-test.txt

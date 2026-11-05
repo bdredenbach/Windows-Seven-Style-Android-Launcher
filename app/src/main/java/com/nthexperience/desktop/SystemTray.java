@@ -28,6 +28,7 @@ final class SystemTray extends LinearLayout {
     private String page="";
     private int leftInset,rightInset,restoreVolume;
     private final AeroIcon taskManager;
+    private final TextView actionCenter;
     private final BrightnessControl brightness;private boolean expanded;private final android.content.SharedPreferences prefs;private TextView compactStatus;
     private boolean running,batteryRegistered,networkRegistered,tracking;
     private final BroadcastReceiver batteryChanged=new BroadcastReceiver(){public void onReceive(Context c,Intent i){if(Intent.ACTION_BATTERY_CHANGED.equals(i.getAction()))battery=i;update();}};
@@ -45,6 +46,14 @@ final class SystemTray extends LinearLayout {
         taskManager.setBackground(Aero.selection(c));
         taskManager.setOnClickListener(v -> host.open("@taskmanager"));
         addView(taskManager, new LayoutParams(dp(44), dp(48)));
+        actionCenter=Aero.text(c,"⚑",21,Color.WHITE);
+        actionCenter.setGravity(Gravity.CENTER);
+        actionCenter.setFocusable(true);
+        actionCenter.setContentDescription("Action Center");
+        actionCenter.setTooltipText("Action Center");
+        actionCenter.setBackground(Aero.selection(c));
+        actionCenter.setOnClickListener(v->host.open("@actioncenter"));
+        addView(actionCenter,new LayoutParams(dp(44),dp(48)));
         compactStatus=Aero.text(c,"⌃",21,Color.WHITE);compactStatus.setGravity(Gravity.CENTER);compactStatus.setContentDescription("Device controls");compactStatus.setFocusable(true);compactStatus.setBackground(Aero.selection(c));compactStatus.setOnClickListener(v->{expanded=!expanded;prefs.edit().putBoolean("tray_expanded",expanded).apply();updateIconVisibility();host.layout();});compactStatus.setOnLongClickListener(v->{show("controls");return true;});addView(compactStatus,0,new LayoutParams(dp(44),dp(48)));updateIconVisibility();
     }
     void fitWidth(int workspaceWidth) {
@@ -67,6 +76,7 @@ final class SystemTray extends LinearLayout {
     void clockNow(){if(compactStatus!=null){compactStatus.setTextSize(20);compactStatus.setText(expanded?"›":"‹");compactStatus.setTooltipText(expanded?"Hide notification icons":"Show hidden notification icons");}}
     private void updateIconVisibility() {
         taskManager.setVisibility(expanded ? VISIBLE : GONE);
+        actionCenter.setVisibility(expanded ? VISIBLE : GONE);
         for (TrayIcon icon : icons) {
             icon.setVisibility(expanded ? VISIBLE : GONE);
         }

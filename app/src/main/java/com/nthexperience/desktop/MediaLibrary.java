@@ -77,6 +77,35 @@ final class MediaLibrary {
         result.sort(Comparator.comparing(item -> item.name, String.CASE_INSENSITIVE_ORDER));
         return result;
     }
+    List<Entry> recent(){
+        List<Entry> result=new ArrayList<>();
+        try{
+            JSONArray saved=new JSONArray(preferences.getString("recent","[]"));
+            for(int i=0;i<Math.min(8,saved.length());i++){
+                JSONObject item=saved.optJSONObject(i);
+                if(item==null)continue;
+                Entry entry=entry(Uri.parse(item.optString("uri")),item.optString("name"),item.optString("mime"));
+                if(entry!=null)result.add(entry);
+            }
+        }catch(JSONException invalid){}
+        return result;
+    }
+    void played(Entry item){
+        if(item==null)return;
+        List<Entry> history=recent();
+        history.removeIf(entry->entry.uri.equals(item.uri));
+        history.add(0,item);
+        JSONArray saved=new JSONArray();
+        for(int i=0;i<Math.min(8,history.size());i++){
+            Entry entry=history.get(i);
+            JSONObject value=new JSONObject();
+            GadgetLayout.put(value,"uri",entry.uri.toString());
+            GadgetLayout.put(value,"name",entry.name);
+            GadgetLayout.put(value,"mime",entry.mime);
+            saved.put(value);
+        }
+        preferences.edit().putString("recent",saved.toString()).apply();
+    }
     boolean contains(Uri uri) { return entries.containsKey(uri); }
     int remaining() { return LIMIT - entries.size(); }
     int add(List<Entry> files) {

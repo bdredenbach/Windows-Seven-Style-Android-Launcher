@@ -44,6 +44,9 @@ for name in home-upgrade aero-snap-left-preview aero-snap-top-preview aero-snap-
   adb exec-out run-as "$launcher" cat "files/$name.png" > "screenshots/$name.png" 2>/dev/null || rm -f "screenshots/$name.png"
 done
 adb shell pm clear "$launcher"
+timeout -k 3s 100s adb shell am instrument -w -e suite storage -e phase resize "$runner".StorageSmoke | tee resize-test.txt
+grep -q 'PASS:' resize-test.txt
+adb shell pm clear "$launcher"
 adb shell pm list instrumentation | tee instrumentation-test.txt
 grep -q 'com.nthexperience.desktop.AuthenticitySmoke' instrumentation-test.txt
 timeout -k 3s 240s adb shell am instrument -w "$runner".PolishSmoke | tee polish-test.txt

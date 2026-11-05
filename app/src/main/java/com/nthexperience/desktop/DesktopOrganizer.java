@@ -20,8 +20,16 @@ final class DesktopOrganizer extends VistaShell {
     DesktopOrganizer(Context context,DesktopStore store,Actions actions,Host host,Supplier<List<AppCatalog.Entry>> apps,String initial){
         super(context,store,actions,"Search shortcuts");this.host=host;this.apps=apps;
         viewMode=store.prefs.getString("shortcut_folder_view","Medium icons");
-        commands.addView(command("Organize ▾",this::organize),new LayoutParams(-2,dp(36)));commands.addView(command("Views ▾",this::views),new LayoutParams(-2,dp(36)));
+        TextView organize=command("Organize ▾",this::organize),views=command("Views ▾",this::views);
+        commands.addView(organize,new LayoutParams(-2,dp(36)));commands.addView(views,new LayoutParams(-2,dp(36)));
         addPrograms=command("Add programs",()->navigate("add:"+target()));commands.addView(addPrograms,new LayoutParams(-2,dp(36)));explorerChrome(this::classicMenu);enableNavigationToggle();
+        addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{
+            boolean narrow=r-l<dp(240);
+            folders.setText(narrow?"☰":"Folders");organize.setText(narrow?"⋯":"Organize ▾");
+            views.setText(narrow?"▦":"Views ▾");addPrograms.setText(narrow?"+":"Add programs");
+            organize.setContentDescription("Organize");views.setContentDescription("Views");
+            addPrograms.setContentDescription("Add programs");
+        });
         LinearLayout location=(LinearLayout)address.getParent();int index=location.indexOfChild(address);location.removeView(address);crumbs=new LinearLayout(context);crumbs.setGravity(Gravity.CENTER_VERTICAL);crumbs.setBackground(Aero.panel(context,0xffffffff,0xfff1f7fb,1,0xff8ea6b8));crumbs.setContentDescription("Address bar");location.addView(crumbs,index,new LayoutParams(0,dp(32),1));TextView refresh=command("↻",this::refreshApps);refresh.setTextSize(19);refresh.setContentDescription("Refresh folder");location.addView(refresh,new LayoutParams(dp(28),dp(32)));start(initial);
     }
     private String target(){String page=page();if(page.startsWith("add:"))return page.substring(4);return page.startsWith("contents:")||page.equals("quick")?page:"desktop";}

@@ -26,7 +26,11 @@ final class VistaControlPanel extends VistaShell {
     private int columns(int minimum,int maximum){int width=content.getWidth();if(width<=0)width=getWidth()>0?getWidth():dp(360);return Math.max(1,Math.min(maximum,(width-dp(32))/dp(minimum)));}
     private void selectView(boolean value){boolean same=page().equals("home")&&query().isEmpty();classic=value;store.prefs.edit().putBoolean("control_panel_classic",value).apply();navigate("home");if(same)render();}
     private void selectCategory(String key){classic=false;store.prefs.edit().putBoolean("control_panel_classic",false).apply();navigate("category:"+key);}
+    private CheckBox usageCheckbox;
+    private View usageHelp;
+
     @Override void render(){
+        usageCheckbox=null;usageHelp=null;
         if(nameInput!=null)nameDraft=nameInput.getText().toString();nameInput=null;renderPane();LinearLayout column=column();String page=page();updateAddress();status.setText("Nth Desktop  •  "+title(page));
         if(!query().isEmpty())searchResults(column);
         else if(page.equals("home")){viewPicker(column);if(classic)classicView(column);else categoryHome(column);}
@@ -39,7 +43,7 @@ final class VistaControlPanel extends VistaShell {
             case "sounds":heading(column,"Desktop sound effects","Choose the cues you want to hear.");DesktopSounds.settings(getContext(),column);break;
             case "startup":startup(column);break;
             case "taskbar":heading(column,"Taskbar and Start Menu","Choose how your taskbar and Start menu behave.");
-                taskRow(column,"Taskbar grouping","Never, when full, or always group folder windows","files","page:grouping");check(column,"Show taskbar labels","taskbar_show_labels",false,()->actions.action("taskbar-refresh"));check(column,"Show window previews on mouse hover","taskbar_previews",true,()->actions.action("taskbar-refresh"));check(column,"Show Android status bar","show_status_bar",false,()->actions.action("chrome"));check(column,"Show Android app taskbar buttons","taskbar_apps",true,()->actions.action("taskbar-refresh"));check(column,"Include apps opened outside Nth Desktop","taskbar_usage",false,()->actions.action("taskbar-usage"));TextView usage=Aero.text(getContext(),"Optional Usage Access adds app buttons when you return here. Android manages how long those tasks stay in memory.",12,0xff586976);column.addView(usage);taskRow(column,"Quick Launch","Choose and order taskbar shortcuts","programs","open:@quicklaunch");taskRow(column,"Choose default home app","Use Nth Desktop as your home","control","home");break;
+                taskRow(column,"Taskbar grouping","Never, when full, or always group folder windows","files","page:grouping");check(column,"Show taskbar labels","taskbar_show_labels",false,()->actions.action("taskbar-refresh"));check(column,"Show window previews on mouse hover","taskbar_previews",true,()->actions.action("taskbar-refresh"));check(column,"Show Android status bar","show_status_bar",false,()->actions.action("chrome"));check(column,"Show Android app taskbar buttons","taskbar_apps",true,()->actions.action("taskbar-refresh"));taskbarUsage(column);taskRow(column,"Quick Launch","Choose and order taskbar shortcuts","programs","open:@quicklaunch");taskRow(column,"Choose default home app","Use Nth Desktop as your home","control","home");break;
             case "sidebar":heading(column,"Gadget Settings","Arrange gadgets anywhere on your desktop.");check(column,"Keep gadgets above windows","sidebar_always_top",false,()->actions.action("sidebar-apply"));taskRow(column,"Show desktop gadgets","Restore the gadgets to their saved positions","gadgets","sidebar-show");taskRow(column,"Hide desktop gadgets","Hide your gadgets and keep their settings","close","sidebar-hide");taskRow(column,"Add gadgets…","Open Gadget Gallery","gadgets","open:@gadgets");break;
             case "icons":heading(column,"Desktop Settings","Choose your icon layout, grid and desktop shortcuts.");column.addView(new DesktopSettings(getContext(),store,()->actions.action("desktop")),new LayoutParams(-1,-2));section(column,"Built-in desktop icons");String[][] icons={{"@recycle","Recycle Bin"},{"@computer","Computer"},{"@files","Files"},{"@notes","Notepad"},{"@photos","Photo Gallery"},{"@appearance","Personalize"},{"@control","Control Panel"},{"@filemanagers","File Managers"}};for(String[] icon:icons){CheckBox box=checkbox(icon[1],store.pinned(icon[0]));box.setOnCheckedChangeListener((v,value)->{if(value!=store.pinned(icon[0]))store.toggle(icon[0]);actions.action("desktop");});column.addView(box);}link(column,"Manage all desktop shortcuts",()->actions.action("shortcuts"));link(column,"Restore original desktop icons",()->actions.action("reset-icons"));break;
             case "accounts":accounts(column);break;
@@ -70,6 +74,14 @@ final class VistaControlPanel extends VistaShell {
         panelHeading(column,"Change the visuals and sounds on your desktop");
         section(column,"Aero Themes and Basic Themes");
         column.addView(new SevenThemes(getContext(),store,columns(145,4),()->{actions.action("wallpaper");render();}));
+        section(column,"My Themes");
+        taskLink(column,"Save current theme…","theme-save");
+        taskLink(column,"Import an Nth theme…","theme-import");
+        JSONArray themes=ThemeProfiles.saved(store);
+        for(int i=0;i<themes.length();i++){
+            JSONObject theme=themes.optJSONObject(i);
+            if(theme!=null)taskLink(column,theme.optString("name","Saved theme"),"theme-preview:"+i);
+        }
         section(column,"Desktop appearance");
         for(ControlPanelCatalog.Task task:ControlPanelCatalog.panel("personalization").tasks){
             ControlPanelCatalog.Panel owner=ControlPanelCatalog.owner(task.destination);
@@ -110,7 +122,6 @@ final class VistaControlPanel extends VistaShell {
     private void paneLink(String title,boolean selected,Runnable action){TextView link=Aero.text(getContext(),title,11,0xff165483);link.setPadding(dp(3),dp(7),dp(2),dp(7));if(selected)link.setTypeface(Aero.strong(getContext()));link.setContentDescription(title);link.setFocusable(true);android.graphics.drawable.StateListDrawable states=new android.graphics.drawable.StateListDrawable();for(int state:new int[]{android.R.attr.state_pressed,android.R.attr.state_focused,android.R.attr.state_hovered})states.addState(new int[]{state},Aero.panel(getContext(),0x553b5e86,0x55224662,2,0));states.addState(new int[]{},new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));link.setBackground(states);link.setOnClickListener(v->action.run());side.addView(link,new LayoutParams(-1,-2));}
     private void renderPane(){side.removeAllViews();paneLink("Control Panel Home",page().equals("home")&&!classic,()->selectView(false));if(page().startsWith("category:")){for(String[] category:CATEGORIES)paneLink(category[1],page().equals("category:"+category[0]),()->selectCategory(category[0]));}paneLink("Classic View",page().equals("home")&&classic,()->selectView(true));String[][] related=related();if(related.length>0){side.addView(new View(getContext()),new LayoutParams(1,dp(20),1));paneHeading(page().equals("personalization")?"Tasks and See also":"See also");for(String[] item:related)paneLink(item[0],false,()->destination(item[1]));}}
     private String title(String page){if(page.equals("category:security"))return "System and Security";if(page.startsWith("category:"))for(String[] category:CATEGORIES)if(category[0].equals(page.substring(9)))return category[1];ControlPanelCatalog.Panel owner=ControlPanelCatalog.owner("page:"+page);if(owner!=null){if(owner.destination.equals("page:"+page))return owner.title;for(ControlPanelCatalog.Task task:owner.tasks)if(task.destination.equals("page:"+page))return task.title;}return "Control Panel";}
-    void wallpaperChosen(String uri){wallpaperChosen(Collections.singletonList(uri));}
     void wallpaperChosen(List<String> photos){
         BackgroundPicker.imported(backgroundDraft,photos);
         if(page().equals("background"))render();else navigate("background");
@@ -140,11 +151,49 @@ final class VistaControlPanel extends VistaShell {
         check(column,"Play the original Nth startup chime","startup_sound",false,()->{});TextView sound=Aero.text(getContext(),"Sound follows your phone’s sound mode and stays quiet while music is playing.",12,0xff586976);sound.setPadding(0,dp(4),0,dp(10));column.addView(sound);check(column,"Reduce motion","reduce_motion",false,()->{});TextView reduced=Aero.text(getContext(),"Also follows Android’s animation setting. Reduced motion uses a brief, silent still welcome.",12,0xff586976);reduced.setPadding(0,dp(4),0,dp(12));column.addView(reduced);TextView preview=Aero.button(getContext(),"Preview startup",()->actions.action("startup-preview"));preview.setContentDescription("Preview startup");column.addView(preview,new LayoutParams(-1,dp(44)));link(column,"Desktop sound effects",()->navigate("sounds"));link(column,"Open Welcome Center",()->actions.open("@welcome"));
     }
     private void selectWallpaper(int value){store.prefs.edit().putInt("wallpaper",value).apply();wallpaper.theme(value);actions.action("wallpaper");render();}
+    private void taskbarUsage(LinearLayout column){
+        usageCheckbox=checkbox("Include apps opened outside Nth Desktop",false);
+        usageCheckbox.setOnClickListener(view->{
+            CheckBox box=(CheckBox)view;
+            boolean enable=box.isChecked();
+            if(enable&&!ExternalTasks.permitted(getContext()))box.setChecked(false);
+            actions.action(enable?"taskbar-usage-enable":"taskbar-usage-disable");
+        });
+        column.addView(usageCheckbox);
+        column.addView(Aero.text(getContext(),"Optional Usage Access adds taskbar buttons for apps you open elsewhere.",12,0xff586976));
+
+        LinearLayout help=Aero.column(getContext());
+        help.setPadding(0,dp(5),0,0);
+        help.addView(Aero.text(getContext(),"Turn on Android’s Usage Access switch for "
+                +getContext().getString(R.string.app_name)+", then press Back.",12,0xff586976));
+        if(Build.VERSION.SDK_INT>=33){
+            TextView blocked=Aero.text(getContext(),"If Android says access was denied, open App info. "
+                    +"Tap ⋮, choose Allow restricted settings, then press Back to continue.",12,0xff586976);
+            blocked.setPadding(0,dp(5),0,0);
+            help.addView(blocked);
+            link(help,"Open App info",()->actions.action("taskbar-usage-app-info"))
+                    .setContentDescription("Open App info for Usage Access");
+        }
+        column.addView(help);
+        usageHelp=help;
+        TextView privacy=Aero.text(getContext(),"Vista checks recent app usage when you return to the desktop. "
+                +"Taskbar buttons stay in memory for the current session. This feature does not save usage history or run a background service.",12,0xff586976);
+        privacy.setPadding(0,dp(5),0,dp(8));
+        column.addView(privacy);
+        refreshUsageAccess(ExternalTasks.permitted(getContext()));
+    }
+
+    void refreshUsageAccess(boolean permitted){
+        if(usageCheckbox==null)return;
+        usageCheckbox.setChecked(ExternalTasks.includesExternalApps(store,permitted));
+        usageHelp.setVisibility(permitted?GONE:VISIBLE);
+    }
+
     private CheckBox checkbox(String title,boolean checked){return Aero.check(getContext(),title,checked);}
     private void check(LinearLayout column,String title,String key,boolean fallback,Runnable changed){CheckBox box=checkbox(title,store.prefs.getBoolean(key,fallback));box.setOnCheckedChangeListener((v,value)->{store.prefs.edit().putBoolean(key,value).apply();changed.run();});column.addView(box);}
     private void accounts(LinearLayout column){heading(column,"Change your desktop name","This name appears at the top of your Start menu.");nameInput=new EditText(getContext());nameInput.setSingleLine(true);nameInput.setTypeface(Aero.face(getContext()));nameInput.setTextSize(15);nameInput.setContentDescription("Desktop name");nameInput.setText(nameDraft==null?store.prefs.getString("desktop_name",getContext().getString(R.string.app_name)):nameDraft);column.addView(nameInput,new LayoutParams(-1,dp(46)));column.addView(Aero.button(getContext(),"Save name",()->{String value=nameInput.getText().toString().trim();if(value.isEmpty()){nameInput.setError("Enter a name");return;}value=value.substring(0,Math.min(40,value.length()));store.prefs.edit().putString("desktop_name",value).apply();nameDraft=value;status.setText("Desktop name saved");Toast.makeText(getContext(),"Desktop name saved",Toast.LENGTH_SHORT).show();actions.action("profile");}));section(column,"Your picture");column.addView(ProfilePortrait.view(getContext(),store),new LayoutParams(dp(74),dp(74)));link(column,"Choose a profile picture…",()->{nameDraft=nameInput.getText().toString();actions.action("profile-pick");}).setContentDescription("Choose a profile picture…");link(column,"Use the Nth picture",()->{store.prefs.edit().remove("profile_portrait").apply();actions.action("profile");render();});link(column,"Manage device accounts in Android",()->actions.action("android:accounts"));}
     private void system(LinearLayout column){
-        heading(column,"View basic information about your computer","");section(column,"Nth Desktop edition");
+        heading(column,"View basic information about your computer","");section(column,getContext().getString(R.string.app_name)+" edition");
         LinearLayout edition=new LinearLayout(getContext());edition.setGravity(Gravity.CENTER_VERTICAL);LinearLayout identity=Aero.column(getContext());
         String appName=getContext().getString(R.string.app_name);
         TextView brand=Aero.text(getContext(),appName,24,0xff1e4e76);identity.addView(brand);

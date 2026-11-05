@@ -14,7 +14,7 @@ final class AeroGlass extends Drawable {
     private final Path clip=new Path();
     private boolean active=true;
     private boolean stacked;
-    private int insetTop;
+    private int insetTop,progress=-2;
     private int drawableAlpha=255;
     static final int DEFAULT_OPACITY=85;
     private final android.content.SharedPreferences prefs;
@@ -23,6 +23,7 @@ final class AeroGlass extends Drawable {
     AeroGlass(AeroWallpaper wallpaper,int style){this.wallpaper=wallpaper;this.style=style;prefs=wallpaper.getContext().getSharedPreferences("desktop",0);wallpaper.register(this);}
     void active(boolean value){if(active!=value){active=value;invalidateSelf();}}
     void stacked(boolean value){stacked=value;invalidateSelf();}
+    void progress(int value){if(progress!=value){progress=value;invalidateSelf();}}
     void insetTop(int pixels){insetTop=pixels;invalidateSelf();}
     @Override public void draw(Canvas c){
         rect.set(getBounds());rect.top+=insetTop;if(rect.isEmpty())return;float d=getCallback() instanceof View?((View)getCallback()).getResources().getDisplayMetrics().density:1;
@@ -46,6 +47,11 @@ final class AeroGlass extends Drawable {
         if(style!=SIDEBAR){
             p.setShader(new LinearGradient(0,0,rect.width(),rect.height(),new int[]{0x00ffffff,0x20ffffff,0x00ffffff,0x10ffffff},new float[]{0,.23f,.45f,1},Shader.TileMode.CLAMP));
             Path beam=new Path();beam.moveTo(rect.width()*.05f,0);beam.lineTo(rect.width()*.35f,0);beam.lineTo(rect.width()*.78f,rect.height());beam.lineTo(rect.width()*.48f,rect.height());beam.close();c.drawPath(beam,p);p.setShader(null);
+        }
+        if(style==TASKBUTTON&&progress>=-1){
+            p.setColor(progress<0?0xff68acd2:0xff6cc564);
+            float portion=progress<0?1:Math.max(.04f,Math.min(1,progress/100f));
+            c.drawRect(rect.left,rect.bottom-4*d,rect.left+rect.width()*portion,rect.bottom,p);
         }
         c.restoreToCount(save);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(d);p.setColor(style==WINDOW?0xc5f3fbff:0x90b8ced9);c.drawRoundRect(rect.left+d*.5f,rect.top+d*.5f,rect.right-d*.5f,rect.bottom-d*.5f,radius,radius,p);
         p.setColor(0x55000000);c.drawLine(rect.left,rect.bottom-d,rect.right,rect.bottom-d,p);

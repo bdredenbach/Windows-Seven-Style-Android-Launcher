@@ -2,6 +2,7 @@ package com.nthexperience.desktop;
 
 /** Edge targeting in workspace coordinates, with the top edge taking priority at corners. */
 final class AeroSnap {
+    static final int MIN_SIDE_WIDTH_DP=160;
     enum Placement { FLOATING, MAXIMIZED, LEFT, RIGHT }
 
     static boolean canSplit(int width, int height, int minimumWidth, int minimumHeight) {

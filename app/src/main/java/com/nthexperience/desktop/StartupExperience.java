@@ -13,6 +13,7 @@ import android.widget.*;
 /** An optional in-launcher introduction. No boot receiver, background activity or system-boot replacement. */
 final class StartupExperience {
     static final String SESSION="startup_session", HOME_OFFERED="home_prompt_offered";
+    private static final String USAGE_SETUP_PENDING="usage_setup_pending";
     private final MainActivity activity;
     private final FrameLayout host;
     private final DesktopStore store;
@@ -53,9 +54,19 @@ final class StartupExperience {
     private void watchEarlyBoot(){if(resumed&&store.prefs.getInt("startup_mode",0)==1&&SystemClock.uptimeMillis()<bootWatchDeadline)host.postDelayed(reconsider,1000);}
     private void finishSetup(){
         if(!resumed||!activity.hasWindowFocus()||activity.offerInitialHome(session))return;
-        activity.storageReady();if(welcomeChecked)return;welcomeChecked=true;if(!session.getBoolean("welcome_seen",false)||welcomeAtStart){
-        session.edit().putBoolean("welcome_seen",true).apply();welcome.run();
-    }}
+        if(!welcomeChecked){
+            welcomeChecked=true;
+            boolean firstWelcome=!session.getBoolean("welcome_seen",false);
+            if(firstWelcome)session.edit().putBoolean("welcome_seen",true).putBoolean(USAGE_SETUP_PENDING,true).apply();
+            if(firstWelcome||welcomeAtStart)welcome.run();
+        }
+        activity.startupSetupReady();
+    }
+    boolean takeUsageSetupOffer(){
+        if(!session.getBoolean(USAGE_SETUP_PENDING,false))return false;
+        session.edit().remove(USAGE_SETUP_PENDING).commit();
+        return true;
+    }
     private void show(boolean preview){
         ((android.view.inputmethod.InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(host.getWindowToken(),0);
         intro=new Intro(preview);host.addView(intro,new FrameLayout.LayoutParams(-1,-1));intro.start();
