@@ -37,11 +37,21 @@ public final class SevenPolishSmoke extends Instrumentation {
             home=(MainActivity)startActivitySync(new Intent(Intent.ACTION_MAIN).setComponent(new ComponentName(getTargetContext(),MainActivity.class)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));root=home.getWindow().getDecorView();
             ui(()->home.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE));
             await(()->root.getWidth()>root.getHeight()&&home.hasWindowFocus(),"Landscape desktop is focused");settle();
-            reorder();peek();sounds();actionCenter();portrait();
+            List<String> failures=new ArrayList<>();
+            phase("taskbar",this::reorder,failures);phase("Peek",this::peek,failures);phase("sounds",this::sounds,failures);phase("Action Center",this::actionCenter,failures);phase("portrait",this::portrait,failures);
+            if(!failures.isEmpty())throw new AssertionError(String.join("\n",failures));
             result.putString("stream","PASS: real horizontal taskbar drag persists through recreation; keyboard/accessibility reordering; icon-color hover glow; upward flick and still-hold previews; touch and mouse Peek render hollow outlines and restore on release/cancel without changing notes, geometry or minimized state; original sound scheme previews, theme compatibility and backup validation; real-alert Action Center flyout and full-center routing.\n");success=true;
         }catch(Throwable failure){try{if(pointerDown)pointer(MotionEvent.ACTION_CANCEL,pointerX,pointerY);shot("seven-polish-failure");}catch(Throwable ignored){}StringWriter text=new StringWriter();failure.printStackTrace(new PrintWriter(text));result.putString("stream","FAIL: "+text);}
         finally{DesktopSounds.stop();app.unregisterActivityLifecycleCallbacks(lifecycle);}
         finish(success?Activity.RESULT_OK:Activity.RESULT_CANCELED,result);
+    }
+    private interface Phase {void run()throws Exception;}
+    private void phase(String name,Phase test,List<String> failures){
+        try{test.run();}catch(Throwable failure){
+            StringWriter detail=new StringWriter();failure.printStackTrace(new PrintWriter(detail));failures.add(name+": "+detail);
+            progress("phase failed: "+name+" - "+failure);
+            try{if(pointerDown)pointer(MotionEvent.ACTION_CANCEL,pointerX,pointerY);ui(home::onBackPressed);}catch(Throwable ignored){}
+        }
     }
     private void reorder()throws Exception{
         progress("taskbar drag and persistence");
@@ -60,10 +70,13 @@ public final class SevenPolishSmoke extends Instrumentation {
         check(home!=previous,"Activity recreates");root=home.getWindow().getDecorView();await(()->home.hasWindowFocus()&&keys().equals(Arrays.asList("@files","@calendar","@notes")),"Order survives recreation");settle();
         View note=slot("@notes");ui(()->check(note.performAccessibilityAction(R.id.taskbar_move_left,null),"Accessibility Move left works"));
         await(()->keys().equals(Arrays.asList("@files","@notes","@calendar")),"Accessible order applies");
-        ui(()->{
-            View target=slot("@notes");target.requestFocus();
-            target.dispatchKeyEvent(new KeyEvent(0,0,KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DPAD_RIGHT,0,KeyEvent.META_CTRL_ON|KeyEvent.META_SHIFT_ON));
-        });
+        sendKeyDownUpSync(KeyEvent.KEYCODE_TAB); // Enter keyboard mode before requesting non-touch focus.
+        ui(()->check(slot("@notes").requestFocus(),"Taskbar accepts keyboard focus"));
+        long keyTime=SystemClock.uptimeMillis();
+        for(int action:new int[]{KeyEvent.ACTION_DOWN,KeyEvent.ACTION_UP}){
+            KeyEvent event=new KeyEvent(keyTime,SystemClock.uptimeMillis(),action,KeyEvent.KEYCODE_DPAD_RIGHT,0,KeyEvent.META_CTRL_ON|KeyEvent.META_SHIFT_ON,KeyCharacterMap.VIRTUAL_KEYBOARD,0,0,InputDevice.SOURCE_KEYBOARD);
+            check(getUiAutomation().injectInputEvent(event,true),"Keyboard chord is injected");
+        }
         await(()->keys().equals(Arrays.asList("@files","@calendar","@notes")),"Keyboard reorder applies");
         View files=slot("@files");final Bitmap[] images=new Bitmap[3];
         ui(()->{images[0]=draw(files);hover(files,MotionEvent.ACTION_HOVER_ENTER);images[1]=draw(files);hover(files,MotionEvent.ACTION_HOVER_EXIT);images[2]=draw(files);});
