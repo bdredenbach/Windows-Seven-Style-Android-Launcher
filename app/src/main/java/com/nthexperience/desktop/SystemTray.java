@@ -57,7 +57,7 @@ final class SystemTray extends LinearLayout {
     }
     void fitWidth(int workspaceWidth) {
         // Leave room for Start, the clock, and part of the scrolling task strip.
-        int width = Math.min(dp(44), Math.max(dp(24), (workspaceWidth - dp(150)) / getChildCount()));
+        int width = Math.min(dp(44), Math.max(dp(24), (workspaceWidth - dp(170)) / getChildCount()));
         for (int i = 0; i < getChildCount(); i++) {
             View child = getChildAt(i);
             int childWidth = !expanded && child == compactStatus ? dp(44) : width;

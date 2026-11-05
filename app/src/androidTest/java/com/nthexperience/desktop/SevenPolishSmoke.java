@@ -37,7 +37,7 @@ public final class SevenPolishSmoke extends Instrumentation {
             home=(MainActivity)startActivitySync(new Intent(Intent.ACTION_MAIN).setComponent(new ComponentName(getTargetContext(),MainActivity.class)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));root=home.getWindow().getDecorView();
             ui(()->home.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE));
             await(()->root.getWidth()>root.getHeight()&&home.hasWindowFocus(),"Landscape desktop is focused");settle();
-            reorder();peek();sounds();actionCenter();
+            reorder();peek();sounds();actionCenter();portrait();
             result.putString("stream","PASS: real horizontal taskbar drag persists through recreation; keyboard/accessibility reordering; icon-color hover glow; upward flick and still-hold previews; touch and mouse Peek render hollow outlines and restore on release/cancel without changing notes, geometry or minimized state; original sound scheme previews, theme compatibility and backup validation; real-alert Action Center flyout and full-center routing.\n");success=true;
         }catch(Throwable failure){try{if(pointerDown)pointer(MotionEvent.ACTION_CANCEL,pointerX,pointerY);shot("seven-polish-failure");}catch(Throwable ignored){}StringWriter text=new StringWriter();failure.printStackTrace(new PrintWriter(text));result.putString("stream","FAIL: "+text);}
         finally{DesktopSounds.stop();app.unregisterActivityLifecycleCallbacks(lifecycle);}
@@ -138,6 +138,16 @@ public final class SevenPolishSmoke extends Instrumentation {
         store.prefs.edit().putString("linked_folders","[{\"uri\":\"content://com.example.missing/tree/a\",\"name\":\"Missing link\"}]").commit();
         check(ActionCenter.alerts(context,store).size()==1,"Lost linked-folder grants are real alerts");store.prefs.edit().putString("linked_folders","[]").commit();
     }
+    private void portrait()throws Exception{
+        progress("portrait tray and Peek bounds");
+        ui(()->home.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT));
+        await(()->root.getHeight()>root.getWidth(),"Portrait layout settles");settle();
+        View peek=showDesktop(),strip=find(root,v->"taskbar-items".equals(v.getTag()));
+        int[] rootAt=new int[2],peekAt=new int[2];root.getLocationOnScreen(rootAt);peek.getLocationOnScreen(peekAt);
+        check(peekAt[0]>=rootAt[0]&&peekAt[0]+peek.getWidth()<=rootAt[0]+root.getWidth(),"Full Peek touch target stays inside portrait bounds");
+        check(peek.getWidth()>=dp(32)&&strip.getWidth()>0,"Expanded tray leaves a usable Peek target and a scrolling task area");
+        View tray=find(root,v->v instanceof SystemTray);for(int i=0;i<((ViewGroup)tray).getChildCount();i++){View icon=((ViewGroup)tray).getChildAt(i);if(icon.isShown())check(bounds(icon).width()>=dp(24),"Tray controls keep their touch width");}
+    }
     private View showDesktop(){return find(root,v->v instanceof FrameLayout&&( "Show desktop".equals(v.getContentDescription())||"Restore desktop windows".equals(v.getContentDescription())));}
     private View slot(String id){return find(root,v->id.equals(TaskbarReorder.key(v)));}
     private List<String> keys(){View strip=find(root,v->"taskbar-items".equals(v.getTag()));List<String> result=new ArrayList<>();if(strip instanceof ViewGroup&&((ViewGroup)strip).getChildCount()>0){ViewGroup items=(ViewGroup)((ViewGroup)strip).getChildAt(0);for(int i=0;i<items.getChildCount();i++){String id=TaskbarReorder.key(items.getChildAt(i));if(id!=null)result.add(id);}}return result;}
@@ -148,7 +158,7 @@ public final class SevenPolishSmoke extends Instrumentation {
     private Rect bounds(View view){check(view!=null,"Input target exists");Rect rect=new Rect();check(view.getGlobalVisibleRect(rect),"Input target is on screen");return rect;}
     private int dp(int value){return Aero.dp(home,value);}
     private void tap(View view,long hold)throws Exception{Rect at=bounds(view);pointer(MotionEvent.ACTION_DOWN,at.centerX(),at.centerY());SystemClock.sleep(hold);pointer(MotionEvent.ACTION_UP,at.centerX(),at.centerY());settle();}
-    private void pointer(int action,float x,float y){if(action==MotionEvent.ACTION_DOWN){down=SystemClock.uptimeMillis();pointerDown=true;}pointerX=x;pointerY=y;MotionEvent event=MotionEvent.obtain(down,SystemClock.uptimeMillis(),action,x,y,0);event.setSource(InputDevice.SOURCE_TOUCHSCREEN);try{sendPointerSync(event);}finally{event.recycle();}if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL)pointerDown=false;}
+    private void pointer(int action,float x,float y){if(action==MotionEvent.ACTION_DOWN){down=SystemClock.uptimeMillis();pointerDown=true;}pointerX=x;pointerY=y;MotionEvent event=MotionEvent.obtain(down,SystemClock.uptimeMillis(),action,x,y,0);event.setSource(InputDevice.SOURCE_TOUCHSCREEN);try{check(getUiAutomation().injectInputEvent(event,true),"Native input is injected, including system drag handoff");}finally{event.recycle();}if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL)pointerDown=false;}
     private void hover(View view,int action){MotionEvent event=MotionEvent.obtain(SystemClock.uptimeMillis(),SystemClock.uptimeMillis(),action,view.getWidth()/2f,view.getHeight()/2f,0);event.setSource(InputDevice.SOURCE_MOUSE);try{view.dispatchGenericMotionEvent(event);}finally{event.recycle();}}
     private Bitmap draw(View view){Bitmap bitmap=Bitmap.createBitmap(view.getWidth(),view.getHeight(),Bitmap.Config.ARGB_8888);view.draw(new Canvas(bitmap));return bitmap;}
     private void settle(){waitForIdleSync();SystemClock.sleep(220);}
