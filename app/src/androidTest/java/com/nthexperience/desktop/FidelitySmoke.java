@@ -222,7 +222,7 @@ public final class FidelitySmoke extends Instrumentation {
         await(()->find(explorer,v->folder.getName().equals(v.getContentDescription()))!=null,"Library also lists the first location's folder");
         ui(()->find(explorer,v->"Toggle Preview Pane".equals(v.getContentDescription())).performClick());
         await(()->find(explorer,v->"Explorer Preview Pane".equals(v.getContentDescription()))!=null,"Explorer renders Preview Pane");
-        ui(()->find(explorer,v->"Background.png".equals(v.getContentDescription())).performClick());
+        clickPicker(explorer,"Background.png");
         await(()->find(explorer,v->"Preview of Background.png".equals(v.getContentDescription()))!=null,"Preview Pane decodes the selected image");
 
         JSONObject profile=ThemeProfiles.capture(store,"Fidelity portable theme");
@@ -393,8 +393,15 @@ public final class FidelitySmoke extends Instrumentation {
         }
         return null;
     }private AccessibilityNodeInfo node(AccessibilityNodeInfo n,String text){if(n==null)return null;if(text.contentEquals(n.getText()==null?"":n.getText())||text.contentEquals(n.getContentDescription()==null?"":n.getContentDescription()))return n;for(int i=0;i<n.getChildCount();i++){AccessibilityNodeInfo r=node(n.getChild(i),text);if(r!=null)return r;}return null;}
-    private void ui(Runnable r){runOnMainSync(r);try{Thread.sleep(80);}catch(InterruptedException e){throw new AssertionError(e);}}
-    private void await(BooleanSupplier condition,String text)throws Exception{long end=SystemClock.uptimeMillis()+12000;while(SystemClock.uptimeMillis()<end){boolean[] ready={false};runOnMainSync(()->ready[0]=condition.getAsBoolean());if(ready[0])return;Thread.sleep(100);}throw new AssertionError(text);}
+    private void onMain(Runnable work){
+        Throwable[] failure={null};
+        runOnMainSync(()->{try{work.run();}catch(Throwable caught){failure[0]=caught;}});
+        if(failure[0] instanceof Error)throw (Error)failure[0];
+        if(failure[0] instanceof RuntimeException)throw (RuntimeException)failure[0];
+        if(failure[0]!=null)throw new AssertionError(failure[0]);
+    }
+    private void ui(Runnable r){onMain(r);try{Thread.sleep(80);}catch(InterruptedException e){throw new AssertionError(e);}}
+    private void await(BooleanSupplier condition,String text)throws Exception{long end=SystemClock.uptimeMillis()+12000;while(SystemClock.uptimeMillis()<end){boolean[] ready={false};onMain(()->ready[0]=condition.getAsBoolean());if(ready[0])return;Thread.sleep(100);}throw new AssertionError(text);}
     private String shell(String command)throws Exception{try(ParcelFileDescriptor fd=getUiAutomation().executeShellCommand(command);InputStream in=new ParcelFileDescriptor.AutoCloseInputStream(fd);ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] buffer=new byte[4096];int n;while((n=in.read(buffer))!=-1)out.write(buffer,0,n);return out.toString("UTF-8");}}
     private void shot(String name)throws Exception{getUiAutomation().waitForIdle(150,2500);Bitmap image=getUiAutomation().takeScreenshot();check(image!=null,"Screenshot available");try(FileOutputStream out=getTargetContext().openFileOutput(name,0)){image.compress(Bitmap.CompressFormat.PNG,100,out);}image.recycle();}
     private void dump(AccessibilityNodeInfo n,StringBuilder out,int depth){if(n==null||depth>24)return;out.append(depth).append(' ').append(n.getText()).append(" / ").append(n.getContentDescription()).append('\n');for(int i=0;i<n.getChildCount();i++)dump(n.getChild(i),out,depth+1);}
