@@ -68,16 +68,18 @@ final class SevenThemes extends GridLayout {
             for(int id:more)backgrounds.add(DesktopBackgrounds.stock(id));
         }
 
+        String sound(){return !glass?"classic":name.equals("Twilight")||name.equals("Midnight Circuit")?"twilight":name.equals("Meadow")||name.equals("Landscapes")||name.equals("Paper Skies")?"meadow":"seven";}
         boolean matches(DesktopStore store){
             return DesktopBackgrounds.current(store.prefs).equals(backgrounds)
                     &&store.prefs.getInt("aero_color",0)==color
-                    &&store.prefs.getBoolean("aero_transparency",true)==glass;
+                    &&store.prefs.getBoolean("aero_transparency",true)==glass
+                    &&DesktopSounds.scheme(store).equals(sound());
         }
 
         void apply(DesktopStore store){
             android.content.SharedPreferences.Editor edit=store.prefs.edit();
             DesktopBackgrounds.choose(edit,backgrounds,wallpaper);
-            edit.putInt("aero_color",color).putBoolean("aero_transparency",glass).apply();
+            edit.putInt("aero_color",color).putBoolean("aero_transparency",glass).putString(DesktopSounds.SCHEME,sound()).apply();
         }
     }
 }

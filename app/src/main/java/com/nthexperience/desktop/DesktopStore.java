@@ -13,13 +13,21 @@ import org.json.JSONObject;
 
 final class DesktopStore {
     static final int MAX_FOLDERS=64, MAX_ITEMS=256, MAX_QUICK=12;
-    final SharedPreferences prefs;
+    static final String TASKBAR_USAGE="taskbar_usage";
+    final SharedPreferences prefs,usagePrefs;
     final Context context;
-    DesktopStore(Context context) { this.context=context.getApplicationContext();prefs = context.getSharedPreferences("desktop", Context.MODE_PRIVATE); }
+    DesktopStore(Context context) { this.context=context.getApplicationContext();prefs = context.getSharedPreferences("desktop", Context.MODE_PRIVATE);usagePrefs=context.getSharedPreferences("usage_access",Context.MODE_PRIVATE); }
     List<String> desktop() {
         return list("shortcuts", Arrays.asList("@computer", "@browser", "@notes", "@appearance"));
     }
     void migrateDesktop(){
+        // Keep this device-local choice across desktop backup restores and existing installs.
+        if(prefs.contains(TASKBAR_USAGE)){
+            if(usagePrefs.contains(TASKBAR_USAGE)
+                    ||usagePrefs.edit().putBoolean(TASKBAR_USAGE,prefs.getBoolean(TASKBAR_USAGE,false)).commit()){
+                prefs.edit().remove(TASKBAR_USAGE).apply();
+            }
+        }
         if(!prefs.getBoolean("desktop_recycle_added",false)){List<String> icons=desktop();if(!icons.contains("@recycle"))icons.add("@recycle");desktop(icons);prefs.edit().putBoolean("desktop_recycle_added",true).apply();}
         if(prefs.getBoolean("desktop_v41",false))return;
         List<String> shortcuts=desktop();shortcuts.remove("@files");shortcuts.remove("@filemanagers");desktop(shortcuts);prefs.edit().putBoolean("desktop_v41",true).apply();
@@ -33,8 +41,10 @@ final class DesktopStore {
     List<String> startPins(){return list("start_pins",Arrays.asList("@browser","@notes"));}
     void startPins(List<String> ids){save("start_pins",ids);}
     List<String> recents() { return list("recents", new ArrayList<>()); }
+    List<String> taskbarOrder(){return list(TaskbarOrder.KEY,Collections.emptyList());}
+    void taskbarOrder(List<String> ids){save(TaskbarOrder.KEY,TaskbarOrder.clean(ids));}
     List<String> quickLaunch(){return list("quick_launch",Arrays.asList("@browser","@files",MediaLibrary.PLAYER));}
-    void quickLaunch(List<String> ids){save("quick_launch",ids.subList(0,Math.min(MAX_QUICK,ids.size())));}
+    void quickLaunch(List<String> ids){prefs.edit().remove(TaskbarOrder.KEY).apply();save("quick_launch",ids.subList(0,Math.min(MAX_QUICK,ids.size())));}
     JSONObject folders(){return object("app_folders");}
     JSONObject folder(String id){return folders().optJSONObject(id);}
     boolean isFolder(String id){return id!=null&&id.startsWith("folder:")&&folder(id)!=null;}

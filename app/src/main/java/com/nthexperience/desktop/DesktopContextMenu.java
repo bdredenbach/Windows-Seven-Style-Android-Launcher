@@ -31,6 +31,12 @@ final class DesktopContextMenu {
         gutter.addView(image,new FrameLayout.LayoutParams(dp(20),dp(20),Gravity.CENTER));row.addView(gutter,new LinearLayout.LayoutParams(dp(31),-1));
         TextView label=Aero.text(context,title,rowHeight<36?12:13,0xff151a1f);label.setPadding(dp(9),0,dp(12),0);row.addView(label,new LinearLayout.LayoutParams(0,-1,1));row.setEnabled(enabled);row.setAlpha(enabled?1:.42f);row.setOnClickListener(v->{if(enabled){dismiss();action.run();}});items.addView(row,new LinearLayout.LayoutParams(-1,dp(rowHeight)));
     }
+    void section(String title){
+        TextView label=Aero.text(context,title,11,0xff345974);
+        label.setPadding(dp(10),0,dp(6),0);
+        label.setBackgroundColor(0xffe3edf5);
+        items.addView(label,new LinearLayout.LayoutParams(-1,dp(23)));
+    }
     void checked(String title,boolean checked,Runnable action){item(title,checked?"checked":"empty",action);}
     void submenu(String title,String icon,Runnable action){item(title,icon,action);LinearLayout row=(LinearLayout)items.getChildAt(items.getChildCount()-1);TextView arrow=Aero.text(context,"›",18,0xff476277);row.addView(arrow,new LinearLayout.LayoutParams(dp(20),-1));}
     void separator(){LinearLayout row=new LinearLayout(context);row.setPadding(dp(34),dp(3),dp(5),dp(3));View line=new View(context);line.setBackgroundColor(0xffc6cbcf);row.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));items.addView(row,new LinearLayout.LayoutParams(-1,dp(7)));}

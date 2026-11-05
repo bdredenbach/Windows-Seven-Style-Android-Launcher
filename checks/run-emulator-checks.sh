@@ -10,7 +10,7 @@ collect() {
   timeout -k 2s 5s adb exec-out run-as "$launcher" cat shared_prefs/desktop.xml > screenshots/test-desktop-prefs.xml 2>/dev/null || true
   timeout -k 2s 5s adb shell dumpsys window > screenshots/test-window-state.txt 2>/dev/null || true
   timeout -k 2s 8s adb logcat -d -t 500 > screenshots/device-log.txt 2>/dev/null || true
-  for name in home-first-run home-upgrade aero-snap-left-preview aero-snap-top-preview aero-snap-failure nth-media-player nth-media-library nth-media-center nth-media-center-start seven-desktop-libraries seven-folder-previews seven-themes desktop-floating-gadgets nth-media-video nth-media-failure fidelity-failure vista-tray-expanded vista-background-picker vista-taskmanager-graphs vista-folder-windows desktop-large-fonts vista-flip-3d window-switcher window-hover window-private-preview tray-brightness tray-brightness-system explorer-thumbnails recycle-bin saved-workspace recent-items extras-failure vista-taskbar-menu vista-task-manager vista-task-performance vista-window-menu vista-windows-side vista-windows-cascade polish-failure control-panel-appearance personalization-vista control-panel-search control-panel-classic-vista control-panel-vista-landscape desktop-settings shortcut-folder-explorer vista-sidebar-menu vista-explorer-details vista-explorer-groups vista-explorer-icons vista-explorer-landscape vista-start-menu vista-app-taskbar vista-icon-sheet vista-authenticity-failure portrait-cutout-failure vista-system start-orb-menu start-hover start-music desktop-top-hidden desktop-top-shown browser-fullscreen browser-fullscreen-restored browser-rotation sidebar-five sidebar-last-page gadget-dice gadget-colors desktop-free desktop-snapped continuity-failure photo-viewer photo-landscape photo-restored photo-failure vista-dialog browser-home browser-page browser-security browser-restored browser-failure file-open-install-blocked file-open-install file-open-installed file-open-unsupported file-open-failure storage-setup storage-root storage-documents storage-device-menu storage-picker storage-revoked storage-failure desktop start-menu notepad gadget-gallery gadgets-desktop calendar floating-gadgets landscape landscape-notepad landscape-start landscape-calendar restored-portrait control-panel control-panel-classic personalization system computer computer-landscape file-managers explorer-folder desktop-clean default-home-start desktop-context-menu landscape-cutout-left landscape-cutout-right app-folder folder-portrait folder-landscape quick-launch desktop-organization backup-preview backup-restored backup-recovered failure aero-opaque aero-colors aero-windows startup-pearl welcome-center startup-settings aero-failure glass-opacity glass-start-0 glass-start-50 glass-start-100 start-search start-portrait tray-battery tray-network tray-volume tray-calendar gadget-gallery-expanded gadget-pack-desktop gadget-calculator gadget-converter gadget-checklist gadget-stopwatch gadget-countdown gadget-world-clock gadget-headlines explorer-navigation explorer-file-menu explorer-folder-menu explorer-copied-files explorer-read-only explorer-picker explorer-picker-multiple taskbar-no-recents explorer-failure weather-follow-settings gadget-network gadget-compass gadget-puzzle gadget-designs aligned-threebutton-0-status-hidden aligned-threebutton-0-status-shown aligned-threebutton-1-status-hidden aligned-threebutton-1-status-shown aligned-gestural-0-status-hidden aligned-gestural-0-status-shown aligned-gestural-1-status-hidden aligned-gestural-1-status-shown gadgets-failure; do
+  for name in seven-taskbar-order seven-touch-peek seven-sound-schemes seven-action-center seven-portrait-tray seven-polish-failure home-first-run home-upgrade aero-snap-left-preview aero-snap-top-preview aero-snap-failure nth-media-player nth-media-library nth-media-center nth-media-center-start seven-desktop-libraries seven-folder-previews seven-themes desktop-floating-gadgets nth-media-video nth-media-failure fidelity-failure vista-tray-expanded vista-background-picker vista-taskmanager-graphs vista-folder-windows desktop-large-fonts vista-flip-3d window-switcher window-hover window-private-preview tray-brightness tray-brightness-system explorer-thumbnails recycle-bin saved-workspace recent-items extras-failure vista-taskbar-menu vista-task-manager vista-task-performance vista-window-menu vista-windows-side vista-windows-cascade polish-failure control-panel-appearance personalization-vista control-panel-search control-panel-classic-vista control-panel-vista-landscape desktop-settings shortcut-folder-explorer vista-sidebar-menu vista-explorer-details vista-explorer-groups vista-explorer-icons vista-explorer-landscape vista-start-menu vista-app-taskbar vista-icon-sheet vista-authenticity-failure portrait-cutout-failure vista-system start-orb-menu start-hover start-music desktop-top-hidden desktop-top-shown browser-fullscreen browser-fullscreen-restored browser-rotation sidebar-five sidebar-last-page gadget-dice gadget-colors desktop-free desktop-snapped continuity-failure photo-viewer photo-landscape photo-restored photo-failure vista-dialog browser-home browser-page browser-security browser-restored browser-failure file-open-install-blocked file-open-install file-open-installed file-open-unsupported file-open-failure storage-setup storage-root storage-documents storage-device-menu storage-picker storage-revoked storage-failure desktop start-menu notepad gadget-gallery gadgets-desktop calendar floating-gadgets landscape landscape-notepad landscape-start landscape-calendar restored-portrait control-panel control-panel-classic personalization system computer computer-landscape file-managers explorer-folder desktop-clean default-home-start desktop-context-menu landscape-cutout-left landscape-cutout-right app-folder folder-portrait folder-landscape quick-launch desktop-organization backup-preview backup-restored backup-recovered failure aero-opaque aero-colors aero-windows startup-pearl welcome-center startup-settings aero-failure glass-opacity glass-start-0 glass-start-50 glass-start-100 start-search start-portrait tray-battery tray-network tray-volume tray-calendar gadget-gallery-expanded gadget-pack-desktop gadget-calculator gadget-converter gadget-checklist gadget-stopwatch gadget-countdown gadget-world-clock gadget-headlines explorer-navigation explorer-file-menu explorer-folder-menu explorer-copied-files explorer-read-only explorer-picker explorer-picker-multiple taskbar-no-recents explorer-failure weather-follow-settings gadget-network gadget-compass gadget-puzzle gadget-designs aligned-threebutton-0-status-hidden aligned-threebutton-0-status-shown aligned-threebutton-1-status-hidden aligned-threebutton-1-status-shown aligned-gestural-0-status-hidden aligned-gestural-0-status-shown aligned-gestural-1-status-hidden aligned-gestural-1-status-shown gadgets-failure; do
     [[ -s "screenshots/$name.png" ]] && continue
     timeout -k 2s 4s adb exec-out run-as "$launcher" cat "files/$name.png" > "screenshots/$name.png" 2>/dev/null || true
   done
@@ -25,14 +25,25 @@ collect() {
   timeout -k 2s 8s adb exec-out cat /sdcard/Nth-Desktop-Startup.mp4 > screenshots/startup-preview.mp4 2>/dev/null || true
 }
 trap collect EXIT
+suites_failed=0
+run_check() {
+  local output="$1"
+  shift
+  local failed=0
+  if ! "$@" | tee "$output"; then failed=1; fi
+  if ! grep -q 'PASS:' "$output"; then failed=1; fi
+  if [[ "$failed" != 0 ]]; then
+    printf 'FAIL: native suite %s\n' "$output"
+    suites_failed=1
+  fi
+}
 adb install -r fixture/build/outputs/apk/debug/fixture-debug.apk
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 if [[ -f vista-baseline/app/build/outputs/apk/debug/app-debug.apk ]]; then
   bash checks/CheckSideBySide.sh vista-baseline/app/build/outputs/apk/debug/app-debug.apk | tee side-by-side-test.txt
 fi
-timeout -k 3s 90s adb shell am instrument -w -e suite storage -e phase home-upgrade "$runner".StorageSmoke | tee home-upgrade-test.txt
-grep -q 'PASS:' home-upgrade-test.txt
+run_check home-upgrade-test.txt timeout -k 3s 90s adb shell am instrument -w -e suite storage -e phase home-upgrade "$runner".StorageSmoke
 adb shell am force-stop "$launcher"
 snap_status=0
 if ! timeout -k 3s 100s adb shell am instrument -w "$runner".SnapSmoke | tee snap-test.txt ||
@@ -44,95 +55,83 @@ for name in home-upgrade aero-snap-left-preview aero-snap-top-preview aero-snap-
   adb exec-out run-as "$launcher" cat "files/$name.png" > "screenshots/$name.png" 2>/dev/null || rm -f "screenshots/$name.png"
 done
 adb shell pm clear "$launcher"
+run_check resize-test.txt timeout -k 3s 100s adb shell am instrument -w -e suite storage -e phase resize "$runner".StorageSmoke
+adb shell pm clear "$launcher"
+run_check seven-polish-test.txt timeout -k 3s 110s adb shell am instrument -w "$runner".SevenPolishSmoke
+# Preserve the new suite's screenshots before clearing its isolated preferences/files.
+for name in seven-taskbar-order seven-touch-peek seven-sound-schemes seven-action-center seven-portrait-tray seven-polish-failure; do
+  adb exec-out run-as "$launcher" cat "files/$name.png" > "screenshots/$name.png" 2>/dev/null || rm -f "screenshots/$name.png"
+done
+adb shell pm clear "$launcher"
 adb shell pm list instrumentation | tee instrumentation-test.txt
 grep -q 'com.nthexperience.desktop.AuthenticitySmoke' instrumentation-test.txt
-timeout -k 3s 240s adb shell am instrument -w "$runner".PolishSmoke | tee polish-test.txt
-grep -q 'PASS:' polish-test.txt
+run_check polish-test.txt timeout -k 3s 240s adb shell am instrument -w "$runner".PolishSmoke
 adb shell am force-stop "$launcher"
 # Isolated fixtures only; exercise both denied and granted settings access in separate processes.
 adb shell appops set --uid "$launcher" MANAGE_EXTERNAL_STORAGE allow
 adb shell appops set "$launcher" WRITE_SETTINGS deny
-timeout -k 3s 130s adb shell am instrument -w "$runner".MediaSmoke | tee media-test.txt
-grep -q "PASS:" media-test.txt
+run_check media-test.txt timeout -k 3s 130s adb shell am instrument -w "$runner".MediaSmoke
 adb shell am force-stop "$launcher"
-timeout -k 3s 200s adb shell am instrument -w "$runner".FidelitySmoke | tee fidelity-test.txt
-grep -q 'PASS:' fidelity-test.txt
+run_check fidelity-test.txt timeout -k 3s 200s adb shell am instrument -w "$runner".FidelitySmoke
 adb shell am force-stop "$launcher"
-timeout -k 3s 260s adb shell am instrument -w "$runner".DesktopExtrasSmoke | tee extras-test.txt
-grep -q 'PASS:' extras-test.txt
+run_check extras-test.txt timeout -k 3s 260s adb shell am instrument -w "$runner".DesktopExtrasSmoke
 adb shell am force-stop "$launcher"
 adb shell appops set "$launcher" WRITE_SETTINGS allow
-timeout -k 3s 70s adb shell am instrument -w -e phase system "$runner".DesktopExtrasSmoke | tee brightness-test.txt
-grep -q 'PASS:' brightness-test.txt
+run_check brightness-test.txt timeout -k 3s 70s adb shell am instrument -w -e phase system "$runner".DesktopExtrasSmoke
 adb shell am force-stop "$launcher"
 adb shell appops set "$launcher" WRITE_SETTINGS deny
 adb shell settings put system font_scale 1.3
-timeout -k 3s 90s adb shell am instrument -w -e phase usability "$runner".DesktopExtrasSmoke | tee usability-test.txt
-grep -q 'PASS:' usability-test.txt
+run_check usability-test.txt timeout -k 3s 90s adb shell am instrument -w -e phase usability "$runner".DesktopExtrasSmoke
 adb shell am force-stop "$launcher"
 adb shell settings put system font_scale 1.0
 adb shell appops set --uid "$launcher" MANAGE_EXTERNAL_STORAGE deny
 # Validate the new shell commands first; every existing suite still follows.
-timeout -k 3s 390s adb shell am instrument -w "$runner".AuthenticitySmoke | tee authenticity-test.txt
-grep -q 'PASS:' authenticity-test.txt
+run_check authenticity-test.txt timeout -k 3s 390s adb shell am instrument -w "$runner".AuthenticitySmoke
 adb shell am force-stop "$launcher"
 # Exercise the integrated browser before the storage suites reset launcher preferences.
 adb shell input keyevent KEYCODE_WAKEUP
 adb shell wm dismiss-keyguard
-timeout -k 3s 240s adb shell am instrument -w "$runner".BrowserSmoke | tee browser-test.txt
-grep -q 'PASS:' browser-test.txt
+run_check browser-test.txt timeout -k 3s 240s adb shell am instrument -w "$runner".BrowserSmoke
 adb shell am force-stop "$launcher"
 # Gallery uses real native and granted SAF pictures before setup resets preferences.
 adb shell appops set --uid "$launcher" MANAGE_EXTERNAL_STORAGE allow
-timeout -k 3s 230s adb shell am instrument -w "$runner".PhotoSmoke | tee photo-test.txt
-grep -q 'PASS:' photo-test.txt
+run_check photo-test.txt timeout -k 3s 230s adb shell am instrument -w "$runner".PhotoSmoke
 adb shell am force-stop "$launcher"
-timeout -k 3s 210s adb shell am instrument -w "$runner".ContinuitySmoke | tee continuity-test.txt
-grep -q 'PASS:' continuity-test.txt
+run_check continuity-test.txt timeout -k 3s 210s adb shell am instrument -w "$runner".ContinuitySmoke
 adb shell am force-stop "$launcher"
 # Permission changes can restart an Android app; apply them outside instrumentation.
 adb shell appops set --uid "$launcher" MANAGE_EXTERNAL_STORAGE deny
-timeout -k 3s 90s adb shell am instrument -w -e suite storage -e phase setup "$runner".StorageSmoke | tee storage-setup-test.txt
-grep -q 'PASS:' storage-setup-test.txt
+run_check storage-setup-test.txt timeout -k 3s 90s adb shell am instrument -w -e suite storage -e phase setup "$runner".StorageSmoke
 adb shell am force-stop "$launcher"
 adb shell appops set --uid "$launcher" MANAGE_EXTERNAL_STORAGE allow
-timeout -k 3s 150s adb shell am instrument -w -e suite storage -e phase access "$runner".StorageSmoke | tee storage-access-test.txt
-grep -q 'PASS:' storage-access-test.txt
+run_check storage-access-test.txt timeout -k 3s 150s adb shell am instrument -w -e suite storage -e phase access "$runner".StorageSmoke
 adb shell mkdir -p /sdcard/Download
 adb push installprobe/build/outputs/apk/debug/installprobe-debug.apk /sdcard/Download/Nth-Install-Probe.apk
 adb shell am force-stop "$launcher"
 adb shell appops set "$launcher" REQUEST_INSTALL_PACKAGES deny
-timeout -k 3s 90s adb shell am instrument -w -e phase blocked "$runner".FileOpenSmoke | tee file-open-blocked-test.txt
-grep -q 'PASS:' file-open-blocked-test.txt
+run_check file-open-blocked-test.txt timeout -k 3s 90s adb shell am instrument -w -e phase blocked "$runner".FileOpenSmoke
 adb shell am force-stop "$launcher"
 adb shell appops set "$launcher" REQUEST_INSTALL_PACKAGES allow
-timeout -k 3s 230s adb shell am instrument -w "$runner".FileOpenSmoke | tee file-open-test.txt
-grep -q 'PASS:' file-open-test.txt
+run_check file-open-test.txt timeout -k 3s 230s adb shell am instrument -w "$runner".FileOpenSmoke
 adb shell rm -f /sdcard/Download/Nth-Install-Probe.apk
 adb shell appops set "$launcher" REQUEST_INSTALL_PACKAGES deny
 adb shell am force-stop "$launcher"
 adb shell appops set --uid "$launcher" MANAGE_EXTERNAL_STORAGE deny
-timeout -k 3s 60s adb shell am instrument -w -e suite storage -e phase revoked "$runner".StorageSmoke | tee storage-test.txt
-grep -q 'PASS:' storage-test.txt
+run_check storage-test.txt timeout -k 3s 60s adb shell am instrument -w -e suite storage -e phase revoked "$runner".StorageSmoke
 adb shell am force-stop "$launcher"
-timeout -k 3s 260s adb shell am instrument -w "$runner".StorageSmoke | tee explorer-test.txt
-grep -q 'PASS:' explorer-test.txt
+run_check explorer-test.txt timeout -k 3s 260s adb shell am instrument -w "$runner".StorageSmoke
 if [[ "$1" == 30 ]]; then
-  timeout -k 3s 300s adb shell am instrument -w -e suite legacy "$runner".StorageSmoke | tee smoke-test.txt
-  grep -q 'PASS:' smoke-test.txt
+  run_check smoke-test.txt timeout -k 3s 300s adb shell am instrument -w -e suite legacy "$runner".StorageSmoke
 fi
 adb shell pm list instrumentation
 adb shell am force-stop "$launcher"
-timeout -k 3s 230s adb shell am instrument -w -e suite aero "$runner".StorageSmoke | tee aero-test.txt
-grep -q 'PASS:' aero-test.txt
+run_check aero-test.txt timeout -k 3s 230s adb shell am instrument -w -e suite aero "$runner".StorageSmoke
 adb shell am force-stop "$launcher"
-timeout -k 3s 230s adb shell am instrument -w -e suite gadgets "$runner".StorageSmoke | tee gadgets-test.txt
-grep -q 'PASS:' gadgets-test.txt
+run_check gadgets-test.txt timeout -k 3s 230s adb shell am instrument -w -e suite gadgets "$runner".StorageSmoke
 # Apply the cutout while a real portrait launcher window is present so WindowManager relayouts.
 if [[ "$1" == 30 ]]; then
   python3 checks/ConfigurePortraitCutout.py
-  timeout -k 3s 90s adb shell am instrument -w -e suite gadgets -e top-only true "$runner".StorageSmoke | tee desktop-top-test.txt
-  grep -q 'PASS:' desktop-top-test.txt
+  run_check desktop-top-test.txt timeout -k 3s 90s adb shell am instrument -w -e suite gadgets -e top-only true "$runner".StorageSmoke
   adb shell am force-stop "$launcher"
 fi
 adb devices -l
@@ -178,4 +177,5 @@ python3 checks/VerifyReboot.py "$boot" reboot-first.xml reboot-again.xml | tee r
 grep -q 'PASS:' reboot-test.txt
 mkdir -p screenshots
 adb exec-out screencap -p > screenshots/startup-after-reboot.png
-exit "$snap_status"
+if [[ "$snap_status" != 0 || "$suites_failed" != 0 ]]; then exit 1; fi
+exit 0

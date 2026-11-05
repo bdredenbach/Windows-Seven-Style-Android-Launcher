@@ -26,15 +26,18 @@ final class SystemTray extends LinearLayout {
     private SeekBar volume;
     private Intent battery;
     private String page="";
-    private int leftInset,rightInset,restoreVolume;
+    private int leftInset,rightInset,restoreVolume,workspaceBudget;
     private final AeroIcon taskManager;
+    private final TrayFlag actionCenter;private int alertCount=-1;
+    private final SharedPreferences notices;
+    private final SharedPreferences.OnSharedPreferenceChangeListener alertChanges=(saved,key)->{if(key==null||key.equals("files")||key.equals("backup")||key.equals("linked_folders"))refresh();};
     private final BrightnessControl brightness;private boolean expanded;private final android.content.SharedPreferences prefs;private TextView compactStatus;
     private boolean running,batteryRegistered,networkRegistered,tracking;
     private final BroadcastReceiver batteryChanged=new BroadcastReceiver(){public void onReceive(Context c,Intent i){if(Intent.ACTION_BATTERY_CHANGED.equals(i.getAction()))battery=i;update();}};
     private final ConnectivityManager.NetworkCallback networkChanged=new ConnectivityManager.NetworkCallback(){public void onAvailable(Network n){refresh();}public void onLost(Network n){refresh();}public void onCapabilitiesChanged(Network n,NetworkCapabilities caps){refresh();}};
     private final Runnable tick=new Runnable(){public void run(){if(!running||cover==null)return;update();main.postDelayed(this,1000);}};
     SystemTray(Context c,FrameLayout workspace,AeroWallpaper wallpaper,Host host){
-        super(c);prefs=c.getSharedPreferences("desktop",0);expanded=prefs.getBoolean("tray_expanded",false);brightness=new BrightnessControl((android.app.Activity)c);this.workspace=workspace;this.wallpaper=wallpaper;this.host=host;connections=c.getSystemService(ConnectivityManager.class);audio=c.getSystemService(AudioManager.class);power=c.getSystemService(PowerManager.class);setGravity(Gravity.CENTER_VERTICAL);
+        super(c);notices=c.getSharedPreferences("seven_action_center",0);prefs=c.getSharedPreferences("desktop",0);expanded=prefs.getBoolean("tray_expanded",false);brightness=new BrightnessControl((android.app.Activity)c);this.workspace=workspace;this.wallpaper=wallpaper;this.host=host;connections=c.getSystemService(ConnectivityManager.class);audio=c.getSystemService(AudioManager.class);power=c.getSystemService(PowerManager.class);setGravity(Gravity.CENTER_VERTICAL);
         String[] names={"Battery status","Network status","Volume control","Brightness control"};String[] pages={"battery","network","volume","brightness"};
         for(int i=0;i<names.length;i++){TrayIcon icon=new TrayIcon(c,i);icon.setContentDescription(names[i]);icon.setFocusable(true);icon.setBackground(Aero.selection(c));String target=pages[i];icon.setOnClickListener(v->show(target));addView(icon,new LayoutParams(dp(44),dp(48)));icons.add(icon);}
         taskManager = new AeroIcon(c, "taskmanager");
@@ -45,11 +48,26 @@ final class SystemTray extends LinearLayout {
         taskManager.setBackground(Aero.selection(c));
         taskManager.setOnClickListener(v -> host.open("@taskmanager"));
         addView(taskManager, new LayoutParams(dp(44), dp(48)));
+        actionCenter=new TrayFlag(c);
+        actionCenter.setFocusable(true);
+        actionCenter.setContentDescription("Action Center");
+        actionCenter.setTooltipText("Action Center");
+        actionCenter.setBackground(Aero.selection(c));
+        actionCenter.setOnClickListener(v->show("actioncenter"));
+        addView(actionCenter,new LayoutParams(dp(44),dp(48)));
         compactStatus=Aero.text(c,"⌃",21,Color.WHITE);compactStatus.setGravity(Gravity.CENTER);compactStatus.setContentDescription("Device controls");compactStatus.setFocusable(true);compactStatus.setBackground(Aero.selection(c));compactStatus.setOnClickListener(v->{expanded=!expanded;prefs.edit().putBoolean("tray_expanded",expanded).apply();updateIconVisibility();host.layout();});compactStatus.setOnLongClickListener(v->{show("controls");return true;});addView(compactStatus,0,new LayoutParams(dp(44),dp(48)));updateIconVisibility();
     }
-    void fitWidth(int workspaceWidth) {
+    @Override protected void onMeasure(int widthSpec,int heightSpec){
+        sizeIcons();
+        super.onMeasure(widthSpec,heightSpec);
+    }
+    void fitWidth(int workspaceWidth){workspaceBudget=workspaceWidth;sizeIcons();}
+    private void sizeIcons(){
+        int configured=dp(getResources().getConfiguration().screenWidthDp);
+        // Use one budget in measure and layout, including narrower inset/IME transitions.
+        int workspaceWidth=workspaceBudget>0?Math.min(workspaceBudget,configured):configured;
         // Leave room for Start, the clock, and part of the scrolling task strip.
-        int width = Math.min(dp(44), Math.max(dp(24), (workspaceWidth - dp(150)) / getChildCount()));
+        int width = Math.min(dp(44), Math.max(dp(24), (workspaceWidth - dp(200)) / getChildCount()));
         for (int i = 0; i < getChildCount(); i++) {
             View child = getChildAt(i);
             int childWidth = !expanded && child == compactStatus ? dp(44) : width;
@@ -67,27 +85,37 @@ final class SystemTray extends LinearLayout {
     void clockNow(){if(compactStatus!=null){compactStatus.setTextSize(20);compactStatus.setText(expanded?"›":"‹");compactStatus.setTooltipText(expanded?"Hide notification icons":"Show hidden notification icons");}}
     private void updateIconVisibility() {
         taskManager.setVisibility(expanded ? VISIBLE : GONE);
+        actionCenter.setVisibility(expanded ? VISIBLE : GONE);
         for (TrayIcon icon : icons) {
             icon.setVisibility(expanded ? VISIBLE : GONE);
         }
         clockNow();
     }
 
-    void start(){if(running)return;running=true;try{IntentFilter filter=new IntentFilter(Intent.ACTION_BATTERY_CHANGED);filter.addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED);battery=Build.VERSION.SDK_INT>=33?getContext().registerReceiver(batteryChanged,filter,Context.RECEIVER_EXPORTED):getContext().registerReceiver(batteryChanged,filter);batteryRegistered=true;}catch(RuntimeException ignored){}try{if(connections!=null){connections.registerDefaultNetworkCallback(networkChanged);networkRegistered=true;}}catch(RuntimeException ignored){}update();}
-    void stop(){running=false;dismiss();if(batteryRegistered){getContext().unregisterReceiver(batteryChanged);batteryRegistered=false;}if(networkRegistered){connections.unregisterNetworkCallback(networkChanged);networkRegistered=false;}main.removeCallbacksAndMessages(null);}
+    void start(){if(running)return;running=true;notices.registerOnSharedPreferenceChangeListener(alertChanges);prefs.registerOnSharedPreferenceChangeListener(alertChanges);try{IntentFilter filter=new IntentFilter(Intent.ACTION_BATTERY_CHANGED);filter.addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED);battery=Build.VERSION.SDK_INT>=33?getContext().registerReceiver(batteryChanged,filter,Context.RECEIVER_EXPORTED):getContext().registerReceiver(batteryChanged,filter);batteryRegistered=true;}catch(RuntimeException ignored){}try{if(connections!=null){connections.registerDefaultNetworkCallback(networkChanged);networkRegistered=true;}}catch(RuntimeException ignored){}update();}
+    void stop(){running=false;notices.unregisterOnSharedPreferenceChangeListener(alertChanges);prefs.unregisterOnSharedPreferenceChangeListener(alertChanges);dismiss();if(batteryRegistered){getContext().unregisterReceiver(batteryChanged);batteryRegistered=false;}if(networkRegistered){connections.unregisterNetworkCallback(networkChanged);networkRegistered=false;}main.removeCallbacksAndMessages(null);}
     private void refresh(){main.post(()->{if(running)update();});}
     private int topInset;
     void bounds(int left,int right,int top){topInset=top;bounds(left,right);}
-    void bounds(int left,int right){leftInset=left;rightInset=right;if(cover==null)return;FrameLayout.LayoutParams p=(FrameLayout.LayoutParams)frame.getLayoutParams();p.width=Math.min(dp(324),Math.max(1,workspace.getWidth()-left-right-dp(12)));p.height=Math.min(dp(page.equals("calendar")?395:285),Math.max(1,workspace.getHeight()-topInset-dp(10)));p.rightMargin=right+dp(6);frame.setLayoutParams(p);}
+    void bounds(int left,int right){leftInset=left;rightInset=right;if(cover==null)return;FrameLayout.LayoutParams p=(FrameLayout.LayoutParams)frame.getLayoutParams();p.width=Math.min(dp(324),Math.max(1,workspace.getWidth()-left-right-dp(12)));p.height=Math.min(dp(page.equals("calendar")?395:page.equals("actioncenter")?310:285),Math.max(1,workspace.getHeight()-topInset-dp(10)));p.rightMargin=right+dp(6);frame.setLayoutParams(p);}
     boolean dismiss(){if(cover==null)return false;workspace.removeView(cover);cover=null;summary=null;volume=null;page="";tracking=false;main.removeCallbacks(tick);return true;}
     void show(String value){
         if(value.equals(page)&&cover!=null){dismiss();return;}dismiss();host.opening();page=value;
         cover=new FrameLayout(getContext());cover.setElevation(dp(48));cover.setFocusableInTouchMode(true);cover.setContentDescription("System tray flyout");cover.setOnClickListener(v->dismiss());workspace.addView(cover,new FrameLayout.LayoutParams(-1,-1));
         frame=Aero.column(getContext());frame.setBackground(new AeroGlass(wallpaper,AeroGlass.START));Aero.pad(frame,6);frame.setClickable(true);FrameLayout.LayoutParams position=new FrameLayout.LayoutParams(dp(324),dp(285),Gravity.BOTTOM|Gravity.END);position.bottomMargin=dp(5);cover.addView(frame,position);
-        LinearLayout title=new LinearLayout(getContext());TextView name=Aero.text(getContext(),value.equals("battery")?"Power and battery":value.equals("network")?"Network connections":value.equals("volume")?"Volume":value.equals("brightness")?"Brightness":value.equals("controls")?"Device controls":"Clock and calendar",14,Color.WHITE);name.setPadding(dp(6),0,0,0);title.addView(name,new LayoutParams(0,dp(36),1));TextView close=Aero.button(getContext(),"×",this::dismiss);close.setContentDescription("Close tray flyout");title.addView(close,new LayoutParams(dp(38),dp(34)));frame.addView(title);
+        LinearLayout title=new LinearLayout(getContext());TextView name=Aero.text(getContext(),value.equals("actioncenter")?"Action Center":value.equals("battery")?"Power and battery":value.equals("network")?"Network connections":value.equals("volume")?"Volume":value.equals("brightness")?"Brightness":value.equals("controls")?"Device controls":"Clock and calendar",14,Color.WHITE);name.setPadding(dp(6),0,0,0);title.addView(name,new LayoutParams(0,dp(36),1));TextView close=Aero.button(getContext(),"×",this::dismiss);close.setContentDescription("Close tray flyout");title.addView(close,new LayoutParams(dp(38),dp(34)));frame.addView(title);
         LinearLayout body=Aero.column(getContext());Aero.pad(body,12);body.setBackground(Aero.panel(getContext(),0xfffdfefe,0xfff0f6fa,1,0xffa8bccb));ScrollView scroll=new ScrollView(getContext());scroll.setFillViewport(true);scroll.addView(body);frame.addView(scroll,new LayoutParams(-1,0,1));
         summary=Aero.text(getContext(),"",13,Aero.INK);summary.setPadding(0,0,0,dp(12));summary.setContentDescription("Tray status details");body.addView(summary);
         switch(value){
+            case "actioncenter":
+                frame.setContentDescription("Action Center flyout");
+                java.util.List<ActionCenter.Alert> alerts=ActionCenter.alerts(getContext(),new DesktopStore(getContext()));
+                for(ActionCenter.Alert alert:alerts){
+                    TextView heading=Aero.text(getContext(),alert.title,14,0xff234f75);Aero.bold(heading);body.addView(heading);
+                    TextView message=Aero.text(getContext(),alert.message,12,Aero.INK);message.setMaxLines(3);message.setEllipsize(android.text.TextUtils.TruncateAt.END);body.addView(message);
+                    button(body,"Review "+alert.title,()->{dismiss();host.open(alert.target);});
+                }
+                button(body,"Open Action Center",()->{dismiss();host.open("@actioncenter");});break;
             case "controls":
                 for(String[] choice:new String[][]{{"Battery status","battery"},{"Network status","network"},{"Volume control","volume"},{"Brightness control","brightness"},{"Clock and calendar","calendar"}}){TextView link=Aero.button(getContext(),choice[0],()->show(choice[1]));link.setContentDescription(choice[0]);body.addView(link,new LayoutParams(-1,dp(48)));}break;
             case "brightness":brightness.content(body);break;
@@ -111,11 +139,25 @@ final class SystemTray extends LinearLayout {
         try{NetworkCapabilities caps=connections==null?null:connections.getNetworkCapabilities(connections.getActiveNetwork());if(caps==null)return "Not connected";String transport=caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)?"VPN":caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)?"Wi-Fi":caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)?"Mobile network":caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)?"Ethernet":"Network";return transport+" • "+(caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)?"Internet available":caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)?"Internet not verified":"Local connection");}catch(SecurityException ex){return "Open Network settings for connection details";}
     }
     private void update(){
+        int count=ActionCenter.alerts(getContext(),new DesktopStore(getContext())).size();
+        if(count!=alertCount){alertCount=count;actionCenter.invalidate();actionCenter.setTooltipText(count==0?"Action Center: no recent Nth alerts":"Action Center: "+count+" Nth alert"+(count==1?"":"s"));if(Build.VERSION.SDK_INT>=30)actionCenter.setStateDescription(count==0?"No recent Nth alerts":count+" Nth alert"+(count==1?"":"s"));}
         clockNow();for(TrayIcon icon:icons)icon.invalidate();int percentage=percent();icons.get(0).setContentDescription("Battery status"+(percentage<0?"":", "+percentage+"%"));icons.get(1).setContentDescription("Network status");
         if(summary==null)return;
-        switch(page){case "battery":summary.setText((percentage<0?"Battery level unavailable":percentage+"% remaining")+"\n"+(charging()?"Plugged in":"On battery")+"\nBattery Saver: "+(power!=null&&power.isPowerSaveMode()?"On":"Off"));break;case "network":summary.setText(network());break;case "volume":int current=audio==null?0:audio.getStreamVolume(AudioManager.STREAM_MUSIC),max=audio==null?0:audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC);summary.setText("Media volume: "+current+" / "+max+(audio!=null&&audio.isVolumeFixed()?"\nVolume is controlled by your output device":"\nRinger and Do Not Disturb follow Android settings."));if(volume!=null&&!tracking)volume.setProgress(current);break;case "brightness":summary.setText("Screen brightness");break;case "controls":summary.setText(java.text.DateFormat.getDateTimeInstance().format(new Date())+"\n"+(percentage<0?"":percentage+"% battery • ")+network());break;case "calendar":summary.setText(java.text.DateFormat.getDateInstance(java.text.DateFormat.FULL).format(new Date())+"\n"+TimeZone.getDefault().getDisplayName());break;}
+        switch(page){case "actioncenter":summary.setText(alertCount==0?"No recent Nth alerts.":alertCount+" Nth alert"+(alertCount==1?"":"s"));break;case "battery":summary.setText((percentage<0?"Battery level unavailable":percentage+"% remaining")+"\n"+(charging()?"Plugged in":"On battery")+"\nBattery Saver: "+(power!=null&&power.isPowerSaveMode()?"On":"Off"));break;case "network":summary.setText(network());break;case "volume":int current=audio==null?0:audio.getStreamVolume(AudioManager.STREAM_MUSIC),max=audio==null?0:audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC);summary.setText("Media volume: "+current+" / "+max+(audio!=null&&audio.isVolumeFixed()?"\nVolume is controlled by your output device":"\nRinger and Do Not Disturb follow Android settings."));if(volume!=null&&!tracking)volume.setProgress(current);break;case "brightness":summary.setText("Screen brightness");break;case "controls":summary.setText(java.text.DateFormat.getDateTimeInstance().format(new Date())+"\n"+(percentage<0?"":percentage+"% battery • ")+network());break;case "calendar":summary.setText(java.text.DateFormat.getDateInstance(java.text.DateFormat.FULL).format(new Date())+"\n"+TimeZone.getDefault().getDisplayName());break;}
     }
     private int dp(int n){return Aero.dp(getContext(),n);}
+    private final class TrayFlag extends View {
+        final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
+        TrayFlag(Context context){super(context);}
+        @Override protected void onDraw(Canvas canvas){
+            float d=dp(22)/24f;int save=canvas.save();canvas.translate((getWidth()-dp(22))/2f,(getHeight()-dp(22))/2f);canvas.scale(d,d);
+            paint.setColor(0xdd203348);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(3);canvas.drawLine(5,3,5,22,paint);
+            paint.setStrokeWidth(1.5f);paint.setColor(Color.WHITE);canvas.drawLine(5,3,5,22,paint);
+            Path flag=new Path();flag.moveTo(6,4);flag.cubicTo(11,1,15,7,21,4);flag.lineTo(21,14);flag.cubicTo(15,17,11,11,6,14);flag.close();paint.setStyle(Paint.Style.FILL);paint.setShader(new LinearGradient(7,3,21,15,0xfff9fcff,0xffb2c3d1,Shader.TileMode.CLAMP));canvas.drawPath(flag,paint);paint.setShader(null);
+            if(alertCount>0){paint.setColor(0xffecb23d);canvas.drawCircle(20,20,4,paint);paint.setColor(0xff614113);paint.setStrokeWidth(1.5f);canvas.drawLine(20,17.5f,20,20,paint);canvas.drawPoint(20,22,paint);}
+            canvas.restoreToCount(save);
+        }
+    }
     private final class TrayIcon extends View {
         final int kind;final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
         TrayIcon(Context c,int kind){super(c);this.kind=kind;}

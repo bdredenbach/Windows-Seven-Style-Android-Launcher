@@ -191,6 +191,8 @@ final class MediaPanel extends LinearLayout implements Player.Listener {
         row.addView(button, new LayoutParams(0, dp(42), 1));
         return button;
     }
+    MediaPlayback playback(){return playback;}
+
     private MediaTransportButton transport(LinearLayout row, MediaTransportButton.Action action, Runnable click) {
         MediaTransportButton key = new MediaTransportButton(getContext(), action, click);
         row.addView(key, new LayoutParams(dp(44), dp(46)));

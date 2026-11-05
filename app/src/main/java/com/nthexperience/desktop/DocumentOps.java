@@ -66,12 +66,22 @@ final class DocumentOps {
     }
     static String paste(Context context,List<Ref> sources,Uri target,boolean cut,Cancel cancel,java.util.function.Consumer<String> progress)throws IOException {return paste(context,sources,target,cut,cancel,progress,null);}
     static String paste(Context context,List<Ref> sources,Uri target,boolean cut,Cancel cancel,java.util.function.Consumer<String> progress,java.util.function.Consumer<CopyUndo> receipt)throws IOException {
+        return paste(context,sources,target,cut,cancel,progress,receipt,value->{});
+    }
+    static String paste(Context context,List<Ref> sources,Uri target,boolean cut,Cancel cancel,java.util.function.Consumer<String> progress,java.util.function.Consumer<CopyUndo> receipt,java.util.function.IntConsumer percent)throws IOException {
         if(sources.isEmpty())throw new IOException("Copy or cut an item first.");require(context,target,DocumentsContract.Document.FLAG_DIR_SUPPORTS_CREATE,cancel);
         List<Node> plans=new ArrayList<>();Set<String> visited=new HashSet<>();int[] count={0};
         for(Ref source:sources){if(cut&&same(source.parent,target))throw new IOException("The selected item is already in this folder.");if(cut)require(context,source.uri,DocumentsContract.Document.FLAG_SUPPORTS_DELETE,cancel);plans.add(plan(context,source,target,cancel,visited,count,0));}
         List<Uri> created=new ArrayList<>();boolean complete=false;
         try{
-            for(Node node:plans){cancel.check();progress.accept("Copying "+node.source.item.name+"…");String unique=available(context,target,node.source.item.name,true,cancel);Uri destination=create(context,target,node.source.item.mime,unique);created.add(destination);copy(context,node,destination,cancel,progress);}
+            for(Node node:plans){
+                cancel.check();progress.accept("Copying "+node.source.item.name+"…");
+                String unique=available(context,target,node.source.item.name,true,cancel);
+                Uri destination=create(context,target,node.source.item.mime,unique);
+                created.add(destination);
+                copy(context,node,destination,cancel,progress);
+                if(plans.size()>1)percent.accept(Math.min(99,created.size()*100/plans.size()));
+            }
             cancel.check();complete=true;
         }finally{if(!complete)for(Uri uri:created)try{DocumentsContract.deleteDocument(context.getContentResolver(),uri);}catch(Exception ignored){}}
         if(cut){for(Node node:plans)verifyUnchanged(context,node,cancel);for(Node node:plans){cancel.check();progress.accept("Moving "+node.source.item.name+"…");try{require(context,node.source.uri,DocumentsContract.Document.FLAG_SUPPORTS_DELETE,cancel);if(!DocumentsContract.deleteDocument(context.getContentResolver(),node.source.uri))throw new IOException();}catch(Exception ex){throw new IOException("Copies were verified, but an original could not be removed. Check both folders before trying again.",ex);}}}

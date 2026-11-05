@@ -23,7 +23,7 @@ final class VistaDialog extends AlertDialog.Builder {
             LinearLayout bar=new LinearLayout(context);bar.setGravity(Gravity.CENTER_VERTICAL);bar.setPadding(Aero.dp(context,12),0,Aero.dp(context,5),0);bar.setContentDescription("Vista dialog caption");
             bar.setBackground(Aero.gloss(context,new int[]{0xffe5f3fa,0xffcfdfeb,0xffbdd2e1,0xffdceaf3},4,0xff92acbf));
             TextView title=Aero.text(context,caption.toString(),14,0xff142c40);Aero.bold(title);title.setMaxLines(2);title.setEllipsize(android.text.TextUtils.TruncateAt.END);bar.addView(title,new LinearLayout.LayoutParams(0,Aero.dp(context,48),1));
-            if(cancelable){TextView close=Aero.button(context,"×",()->{if(owner[0]!=null)owner[0].cancel();});close.setTextSize(22);close.setContentDescription("Close dialog");close.setMinHeight(0);close.setPadding(0,0,0,0);close.setBackground(Aero.gloss(context,new int[]{0xffe6aa9a,0xffcf6a52,0xffac3d23,0xffcf755e},3,0xff8c5044));close.setTextColor(Color.WHITE);bar.addView(close,new LinearLayout.LayoutParams(Aero.dp(context,40),Aero.dp(context,32)));}
+            if(cancelable){TextView close=new WindowButton(context,"×",()->{if(owner[0]!=null)owner[0].cancel();});close.setTextSize(22);close.setContentDescription("Close dialog");close.setMinHeight(0);close.setPadding(0,0,0,0);close.setTextColor(Color.WHITE);bar.addView(close,new LinearLayout.LayoutParams(Aero.dp(context,40),Aero.dp(context,32)));}
             super.setCustomTitle(bar);
         }
         AlertDialog dialog=super.create();owner[0]=dialog;

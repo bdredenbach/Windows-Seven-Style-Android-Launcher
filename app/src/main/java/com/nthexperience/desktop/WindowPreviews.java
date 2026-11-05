@@ -12,31 +12,56 @@ import java.util.*;
 final class WindowPreviews {
     interface Host {java.util.List<DesktopWindow> windows();java.util.List<String> external();String label(String id);void open(String id);View wallpaper();void showDesktop();void preparePreview();}
     private final Activity activity;private final Host host;private final Handler main=new Handler(Looper.getMainLooper());
-    private Dialog dialog;private PopupWindow folderPicker;private Runnable pending,peekPending;
+    private Dialog dialog;private PopupWindow folderPicker;private Runnable pending,peekPending,touchPeekPending;
     private final List<DesktopWindow> ghosted=new ArrayList<>();
     private final Runnable dismissFolderHover=()->{if(folderPicker!=null&&!folderPicker.isFocusable())folderPicker.dismiss();};
     WindowPreviews(Activity activity,Host host){this.activity=activity;this.host=host;}
+    private void cancelTouchPeek(){if(touchPeekPending!=null){main.removeCallbacks(touchPeekPending);touchPeekPending=null;}clearPeek();}
     void bindDesktopPeek(View button){
+        button.setTooltipText("Tap to show desktop. Hold to peek.");
+        button.setOnTouchListener(new View.OnTouchListener(){
+            boolean tracking,held;float x,y;
+            public boolean onTouch(View v,MotionEvent event){
+                int action=event.getActionMasked();
+                if(action==MotionEvent.ACTION_DOWN){
+                    cancelTouchPeek();tracking=true;held=false;x=event.getX();y=event.getY();
+                    if(event.isButtonPressed(MotionEvent.BUTTON_SECONDARY)){tracking=false;v.performContextClick();return true;}
+                    v.setPressed(true);
+                    touchPeekPending=()->{touchPeekPending=null;if(tracking&&v.isAttachedToWindow()){held=true;clearPeek();applyPeek(null);}};
+                    main.postDelayed(touchPeekPending,350);return true;
+                }
+                if(action==MotionEvent.ACTION_MOVE&&tracking){
+                    int slop=ViewConfiguration.get(v.getContext()).getScaledTouchSlop();
+                    if(Math.abs(event.getX()-x)>slop||Math.abs(event.getY()-y)>slop){tracking=false;v.setPressed(false);cancelTouchPeek();}
+                }
+                if(action==MotionEvent.ACTION_UP){boolean click=tracking&&!held;tracking=false;v.setPressed(false);cancelTouchPeek();if(click)v.performClick();}
+                if(action==MotionEvent.ACTION_CANCEL||action==MotionEvent.ACTION_POINTER_DOWN){tracking=false;v.setPressed(false);cancelTouchPeek();}
+                return true;
+            }
+        });
         button.setOnHoverListener((v,event)->{
             if(event.getActionMasked()==MotionEvent.ACTION_HOVER_ENTER)queuePeek(null);
             if(event.getActionMasked()==MotionEvent.ACTION_HOVER_EXIT)clearPeek();
             return false;
         });
     }
+    private void applyPeek(DesktopWindow selected){
+        for(DesktopWindow window:host.windows()){
+            if(window==selected||!window.isShown()||window.minimizing()||window.getAlpha()!=1f)continue;
+            window.peek(true);ghosted.add(window);
+        }
+    }
     private void queuePeek(DesktopWindow selected){
         clearPeek();
         peekPending=()->{
             if(!activity.hasWindowFocus()&&(folderPicker==null||!folderPicker.isShowing()))return;
-            for(DesktopWindow window:host.windows()){
-                if(window==selected||!window.isShown()||window.minimizing()||window.getAlpha()!=1f)continue;
-                window.setAlpha(.08f);ghosted.add(window);
-            }
+            applyPeek(selected);
         };
         main.postDelayed(peekPending,300);
     }
     private void clearPeek(){
         if(peekPending!=null){main.removeCallbacks(peekPending);peekPending=null;}
-        for(DesktopWindow window:ghosted)if(window.getAlpha()==.08f)window.setAlpha(1f);
+        for(DesktopWindow window:ghosted)window.peek(false);
         ghosted.clear();
     }
     static boolean allowed(DesktopWindow window){return !(window.body instanceof BrowserPanel)||!((BrowserPanel)window.body).hasPrivateTabs();}
@@ -52,7 +77,7 @@ final class WindowPreviews {
                     Math.max(1,Math.round(source.getHeight()*scale)),Bitmap.Config.ARGB_8888);
             Canvas canvas=new Canvas(bitmap);
             canvas.scale(scale,scale);
-            source.draw(canvas);
+            if(source instanceof DesktopWindow)((DesktopWindow)source).drawPreview(canvas);else source.draw(canvas);
             if(source instanceof DesktopWindow&&((DesktopWindow)source).body instanceof MediaPanel){
                 TextureView video=((MediaPanel)((DesktopWindow)source).body).videoSurface();
                 if(video.isShown()&&video.isAvailable()){
@@ -103,8 +128,9 @@ final class WindowPreviews {
     }
     private void bind(View button,java.util.function.Supplier<List<Card>> cards,String group,boolean mouse,Runnable commands){
         button.setOnLongClickListener(v->{showCards(button,cards.get(),group,true,commands);return true;});
-        if(!mouse)return;
         button.setOnHoverListener((v,event)->{
+            if(button.getBackground() instanceof AeroGlass)((AeroGlass)button.getBackground()).hotTrack(event.getActionMasked()!=MotionEvent.ACTION_HOVER_EXIT,event.getX(),event.getY());
+            if(!mouse)return false;
             if(!event.isFromSource(InputDevice.SOURCE_MOUSE)&&!event.isFromSource(InputDevice.SOURCE_STYLUS))return false;
             if(event.getActionMasked()==MotionEvent.ACTION_HOVER_ENTER){
                 main.removeCallbacks(dismissFolderHover);
@@ -118,6 +144,36 @@ final class WindowPreviews {
             return false;
         });
     }
+    private void addMediaControls(LinearLayout card,MediaPlayback playback,List<Runnable> refresh){
+        Context context=card.getContext();
+        LinearLayout row=new LinearLayout(context);
+        row.setGravity(Gravity.CENTER);
+        TextView previous=Aero.button(context,"◀◀",()->playback.player.seekToPreviousMediaItem());
+        previous.setContentDescription("Previous track");
+        TextView play=Aero.button(context,"▶",playback::playPause);
+        TextView next=Aero.button(context,"▶▶",()->playback.player.seekToNextMediaItem());
+        next.setContentDescription("Next track");
+        for(TextView button:new TextView[]{previous,play,next}){
+            button.setMinHeight(0);button.setPadding(0,0,0,0);
+            row.addView(button,new LinearLayout.LayoutParams(0,-1,1));
+        }
+        card.addView(row,new LinearLayout.LayoutParams(-1,Aero.dp(context,34)));
+        Runnable update=()->{
+            boolean ready=!playback.released&&playback.current()!=null;
+            previous.setEnabled(ready&&playback.player.hasPreviousMediaItem());
+            next.setEnabled(ready&&playback.player.hasNextMediaItem());
+            play.setEnabled(ready);
+            boolean playing=ready&&playback.player.getPlayWhenReady()
+                    &&playback.player.getPlaybackState()!=androidx.media3.common.Player.STATE_ENDED;
+            String description=playing?"Pause playback":"Play media";
+            if(!description.equals(play.getContentDescription())){
+                play.setText(playing?"Ⅱ":"▶");
+                play.setContentDescription(description);
+            }
+        };
+        update.run();refresh.add(update);
+    }
+
     private void showCards(View anchor,List<Card> cards,String group,boolean sticky,Runnable commands){
         if(!anchor.isAttachedToWindow()||cards.isEmpty()||!sticky&&(!activity.hasWindowFocus()
                 ||folderPicker!=null&&folderPicker.isFocusable()))return;
@@ -129,7 +185,9 @@ final class WindowPreviews {
         if(safe.width()<Aero.dp(context,110))return;
         int cardWidth=Math.min(Aero.dp(context,190),(safe.width()-4*gap)/Math.min(2,cards.size()));
         int width=Math.min(safe.width()-2*gap,cards.size()*(cardWidth+gap)+gap);
-        int height=Aero.dp(context,sticky?179:149);
+        boolean mediaControls=false;
+        for(Card card:cards)if(card.source instanceof DesktopWindow&&((DesktopWindow)card.source).body instanceof MediaPanel)mediaControls=true;
+        int height=Aero.dp(context,(sticky?179:149)+(mediaControls?36:0));
         LinearLayout shell=Aero.column(context);
         shell.setContentDescription(group==null?(cards.size()>1?"Browser tab previews":"Window preview for "+cards.get(0).title):group);
         shell.setBackground(Aero.gloss(context,new int[]{0xff6088ab,0xff365a7c,0xff183c5d},6,0xff9dbbd0));
@@ -143,6 +201,7 @@ final class WindowPreviews {
         LinearLayout row=new LinearLayout(context);row.setPadding(gap,gap,0,gap);
         scroll.addView(row,new HorizontalScrollView.LayoutParams(-2,-1));
         Map<Card,ImageView> images=new LinkedHashMap<>();
+        List<Runnable> refreshControls=new ArrayList<>();
         for(Card target:cards){
             LinearLayout card=Aero.column(context);Aero.pad(card,4);
             card.setFocusable(true);card.setContentDescription("Switch to "+target.title);
@@ -170,6 +229,10 @@ final class WindowPreviews {
                 images.put(target,image);
             }
             card.addView(body,new LinearLayout.LayoutParams(-1,0,1));
+            if(target.source instanceof DesktopWindow&&((DesktopWindow)target.source).body instanceof MediaPanel){
+                MediaPlayback playback=((MediaPanel)((DesktopWindow)target.source).body).playback();
+                addMediaControls(card,playback,refreshControls);
+            }
             card.setOnClickListener(v->{dismiss();target.open.run();});
             card.setOnHoverListener((v,event)->{
                 boolean over=event.getActionMasked()!=MotionEvent.ACTION_HOVER_EXIT;
@@ -199,6 +262,7 @@ final class WindowPreviews {
         picker.setElevation(Aero.dp(context,8));
         Runnable refresh=new Runnable(){@Override public void run(){
             if(folderPicker!=picker||!picker.isShowing())return;
+            for(Runnable controls:refreshControls)controls.run();
             for(Map.Entry<Card,ImageView> entry:images.entrySet()){
                 Card target=entry.getKey();View source=target.source;ImageView image=entry.getValue();
                 if(source instanceof DesktopWindow&&!allowed((DesktopWindow)source)){picker.dismiss();return;}
@@ -266,5 +330,5 @@ final class WindowPreviews {
         int height=Math.round(activity.getResources().getDisplayMetrics().heightPixels*.75f);dialog.getWindow().setLayout(Math.min(Aero.dp(activity,400),activity.getResources().getDisplayMetrics().widthPixels-Aero.dp(activity,24)),height);
     }
     private void hideHover(){if(pending!=null)main.removeCallbacks(pending);pending=null;main.removeCallbacks(dismissFolderHover);}
-    boolean dismiss(){boolean was=dialog!=null||folderPicker!=null;clearPeek();hideHover();if(folderPicker!=null)folderPicker.dismiss();if(dialog!=null){Dialog old=dialog;dialog=null;old.dismiss();}return was;}
+    boolean dismiss(){boolean was=dialog!=null||folderPicker!=null;cancelTouchPeek();hideHover();if(folderPicker!=null)folderPicker.dismiss();if(dialog!=null){Dialog old=dialog;dialog=null;old.dismiss();}return was;}
 }

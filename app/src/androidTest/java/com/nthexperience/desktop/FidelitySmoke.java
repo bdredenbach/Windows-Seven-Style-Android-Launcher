@@ -30,8 +30,8 @@ public final class FidelitySmoke extends Instrumentation {
         android.accessibilityservice.AccessibilityServiceInfo service=getUiAutomation().getServiceInfo();
         service.flags|=android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS;
         getUiAutomation().setServiceInfo(service);
-        home=(MainActivity)startActivitySync(new Intent(Intent.ACTION_MAIN).setComponent(new ComponentName(getTargetContext(),MainActivity.class)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));root=home.getWindow().getDecorView();await(()->home.hasWindowFocus(),"Focused desktop");sevenDesktop();tray();taskbarModes();binProperties();shortcutRecycle();backgrounds();graphs();folders();
-        result.putString("stream","PASS: Seven reuses pinned icon slots and exposes real Explorer Libraries; task buttons preserve 0/50/100 glass opacity; equal Quick Launch separators; inline tray arrow and real device icons; draft-only background thumbnails, custom picture decode, Save changes and position; real PID/CPU/RAM/network graph sampling and pause/reduced motion; separate Explorer windows, taskbar family grouping, physical icon drag copy/move with exact bytes and original preservation; real folder desktop links and validated backups.\n");success=true;
+        home=(MainActivity)startActivitySync(new Intent(Intent.ACTION_MAIN).setComponent(new ComponentName(getTargetContext(),MainActivity.class)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));root=home.getWindow().getDecorView();await(()->home.hasWindowFocus(),"Focused desktop");sevenDesktop();tray();taskbarModes();binProperties();shortcutRecycle();backgrounds();librariesThemesAndSupport();graphs();folders();
+        result.putString("stream","PASS: Seven reuses pinned icon slots and exposes real Explorer Libraries; task buttons preserve 0/50/100 glass opacity; equal Quick Launch separators; inline tray arrow and real device icons; draft-only background thumbnails, custom picture decode, Save changes and position; combined Explorer Libraries, image Preview Pane, portable theme round trip, Jump List flick and hold separation, and Steps Recorder; real PID/CPU/RAM/network graph sampling and pause/reduced motion; separate Explorer windows, taskbar family grouping, physical icon drag copy/move with exact bytes and original preservation; real folder desktop links and validated backups.\n");success=true;
     }catch(Throwable error){try{shot("fidelity-failure.png");StringBuilder tree=new StringBuilder();dump(getUiAutomation().getRootInActiveWindow(),tree,0);try(FileOutputStream out=getTargetContext().openFileOutput("fidelity-tree.txt",0)){out.write(tree.toString().getBytes(StandardCharsets.UTF_8));}}catch(Exception ignored){}StringWriter text=new StringWriter();error.printStackTrace(new PrintWriter(text));result.putString("stream","FAIL: "+text);
     }finally{try{shell("settings put global animator_duration_scale 0");if(home!=null)ui(()->home.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT));if(folder!=null)delete(folder);for(JSONObject item:RecycleBin.list(getTargetContext()))if(recycleFixture!=null&&recycleFixture.equals(item.optString("shortcut")))RecycleBin.remove(getTargetContext(),item);if(store!=null){SharedPreferences.Editor edit=store.prefs.edit().clear();for(Map.Entry<String,Object> item:original.entrySet()){Object value=item.getValue();String key=item.getKey();if(value instanceof String)edit.putString(key,(String)value);else if(value instanceof Boolean)edit.putBoolean(key,(Boolean)value);else if(value instanceof Integer)edit.putInt(key,(Integer)value);else if(value instanceof Long)edit.putLong(key,(Long)value);else if(value instanceof Float)edit.putFloat(key,(Float)value);}edit.commit();}}catch(Exception ignored){}app.unregisterActivityLifecycleCallbacks(lifecycle);}
         finish(success?Activity.RESULT_OK:Activity.RESULT_CANCELED,result);
@@ -160,17 +160,167 @@ public final class FidelitySmoke extends Instrumentation {
         menuTap(mode);
     }
     private void backgrounds()throws Exception{
-        progress("background preview, save, custom picture and position");int saved=store.prefs.getInt("wallpaper",0);ui(()->home.open("setting:page:background"));VistaControlPanel control=(VistaControlPanel)window("@control").body;int choice=saved==1?2:1;tap(find(control,v->("Preview background: "+(choice==1?"Twilight":"Meadow")).equals(v.getContentDescription())),60);check(store.prefs.getInt("wallpaper",0)==saved,"Thumbnail only previews");tap(text(control,"Save changes"),60);check(store.prefs.getInt("wallpaper",0)==choice,"Save applies");shot("vista-background-picker.png");
+        progress("background preview, save, Explorer pictures and folder, and position");int saved=store.prefs.getInt("wallpaper",0);ui(()->home.open("setting:page:background"));VistaControlPanel control=(VistaControlPanel)window("@control").body;int choice=saved==1?2:1;tap(find(control,v->("Preview background: "+(choice==1?"Twilight":"Meadow")).equals(v.getContentDescription())),60);check(store.prefs.getInt("wallpaper",0)==saved,"Thumbnail only previews");tap(text(control,"Save changes"),60);check(store.prefs.getInt("wallpaper",0)==choice,"Save applies");shot("vista-background-picker.png");
         tap(find(control,v->"Include background: Harmony".equals(v.getContentDescription())),60);
         tap(find(control,v->"Shuffle".equals(v.getContentDescription())),60);
         tap(text(control,"Save changes"),60);
         check(DesktopBackgrounds.current(store.prefs).size()==2,"Two checked pictures form a slideshow");
         DesktopBackup.Plan slideshow=DesktopBackup.parse(DesktopBackup.snapshot(store).toString());
         check(Boolean.TRUE.equals(slideshow.values.get(DesktopBackgrounds.SHUFFLE)),"Slideshow settings survive backup validation");
-        folder=new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS),"Nth-Fidelity-"+SystemClock.uptimeMillis());check(folder.mkdirs(),"Isolated fixture directory");File picture=new File(folder,"Background.png");Bitmap image=Bitmap.createBitmap(160,80,Bitmap.Config.ARGB_8888);image.eraseColor(0xffc64e46);try(FileOutputStream out=new FileOutputStream(picture)){image.compress(Bitmap.CompressFormat.PNG,100,out);}image.recycle();String uri=StorageAccess.document("Documents/"+folder.getName()+"/Background.png").toString();ui(()->control.wallpaperChosen(uri));await(()->{View save=text(control,"Save changes");return save!=null&&save.isEnabled();},"Actual selected image decodes");tap(find(control,v->"Picture position".equals(v.getContentDescription())),60);menuTap("Fit");
+        folder=new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),"Nth-Fidelity-"+SystemClock.uptimeMillis());
+        check(folder.mkdirs(),"Isolated fixture directory");
+        List<String> pictures=new ArrayList<>();
+        Bitmap image=Bitmap.createBitmap(160,80,Bitmap.Config.ARGB_8888);image.eraseColor(0xffc64e46);
+        for(String name:Arrays.asList("Background.png","Second.png","Third.png")){
+            try(FileOutputStream out=new FileOutputStream(new File(folder,name))){image.compress(Bitmap.CompressFormat.PNG,100,out);}
+            pictures.add(StorageAccess.document("Pictures/"+folder.getName()+"/"+name).toString());
+        }
+        image.recycle();
+        try(FileOutputStream out=new FileOutputStream(new File(folder,"Readme.txt"))){out.write(65);}
+
+        List<String> before=DesktopBackgrounds.current(store.prefs);
+        View picturePicker=openBackgroundPicker(control,"Browse pictures…","Nth Explorer — Choose background pictures");
+        clickPicker(picturePicker,"Cancel file selection");
+        await(()->home.hasWindowFocus(),"Cancel returns to Personalization");
+        check(DesktopBackgrounds.current(store.prefs).equals(before),"Cancel leaves the slideshow untouched");
+
+        picturePicker=openBackgroundPicker(control,"Browse pictures…","Nth Explorer — Choose background pictures");
+        clickPicker(picturePicker,folder.getName());
+        clickPicker(picturePicker,"Select Background.png");
+        clickPicker(picturePicker,"Select Second.png");
+        View files=picturePicker;
+        ui(()->check(find(files,v->"Readme.txt".equals(v.getContentDescription()))==null,"Picture picker filters out text files"));
+        clickPicker(picturePicker,"Return selected files");
+        await(()->home.hasWindowFocus()&&text(control,"My Pictures (2)")!=null&&text(control,"Save changes").isEnabled(),"Selected images decode in the draft");
+        check(DesktopBackgrounds.current(store.prefs).equals(before),"Explorer results are draft-only");
+        tap(find(control,v->"Picture position".equals(v.getContentDescription())),60);menuTap("Fit");
         await(()->{View current=find(control,v->"Picture position".equals(v.getContentDescription()));return current instanceof Spinner&&"Fit".equals(((Spinner)current).getSelectedItem());},"Native picture position selection settles");
-        for(int attempt=0;attempt<3&&!uri.equals(store.prefs.getString("wallpaper_photo",""));attempt++)tap(text(control,"Save changes"),60);
-        await(()->uri.equals(store.prefs.getString("wallpaper_photo",""))&&store.prefs.getString("wallpaper_position","").equals("Fit"),"Selected content URI and position applied");close("@control");
+        List<String> selected=pictures.subList(0,2);
+        for(int attempt=0;attempt<3&&!DesktopBackgrounds.current(store.prefs).equals(selected);attempt++)tap(text(control,"Save changes"),60);
+        await(()->DesktopBackgrounds.current(store.prefs).equals(selected)&&store.prefs.getString("wallpaper_position","").equals("Fit"),"Explorer pictures and position applied");
+
+        View folderPicker=openBackgroundPicker(control,"Browse folder…","Nth Explorer — Choose a background folder");
+        clickPicker(folderPicker,folder.getName());
+        clickPicker(folderPicker,"Use this folder");
+        await(()->home.hasWindowFocus()&&text(control,"My Pictures (3)")!=null&&text(control,"Save changes").isEnabled(),"Folder adds only its three pictures");
+        check(DesktopBackgrounds.current(store.prefs).equals(selected),"Folder selection also stays in the draft");
+        tap(text(control,"Save changes"),60);
+        await(()->DesktopBackgrounds.current(store.prefs).equals(pictures),"Folder slideshow saved in name order");
+        close("@control");
+    }
+    private void librariesThemesAndSupport()throws Exception{
+        progress("combined Libraries, Preview Pane, portable themes, Jump Lists and Steps Recorder");
+        String pictures=StorageAccess.page("pictures");
+        String nested=DocumentFolders.childPage(pictures,new DocumentFolders.Item("primary:Pictures/"+folder.getName(),
+                folder.getName(),DocumentsContract.Document.MIME_TYPE_DIR,0,0));
+        LibraryLocations.save(store,"pictures",Arrays.asList(pictures,nested));
+        ui(()->home.open("@files"));
+        DesktopWindow explorerWindow=window("@files");
+        VistaExplorer explorer=(VistaExplorer)explorerWindow.body;
+        ui(()->explorer.openLibrary("pictures"));
+        await(()->find(explorer,v->"Background.png".equals(v.getContentDescription()))!=null,"Library lists the second location's picture");
+        await(()->find(explorer,v->folder.getName().equals(v.getContentDescription()))!=null,"Library also lists the first location's folder");
+        ui(()->find(explorer,v->"Toggle Preview Pane".equals(v.getContentDescription())).performClick());
+        await(()->find(explorer,v->"Explorer Preview Pane".equals(v.getContentDescription()))!=null,"Explorer renders Preview Pane");
+        clickPicker(explorer,"Background.png");
+        await(()->find(explorer,v->"Preview of Background.png".equals(v.getContentDescription()))!=null,"Preview Pane decodes the selected image");
+
+        JSONObject profile=ThemeProfiles.capture(store,"Fidelity portable theme");
+        byte[] packed=ThemeProfiles.pack(getTargetContext(),profile);
+        JSONObject imported=ThemeProfiles.unpack(getTargetContext(),new ByteArrayInputStream(packed));
+        JSONArray images=imported.getJSONArray("backgrounds");
+        check(images.length()==1||images.length()==3,"Portable theme includes the pictures, deduplicating identical image bytes");
+        for(int i=0;i<images.length();i++){
+            Uri uri=Uri.parse(images.getString(i));
+            try(InputStream input=getTargetContext().getContentResolver().openInputStream(uri)){
+                check(input!=null&&input.read()==0xff&&input.read()==0xd8,"Imported theme has a readable private JPEG");
+            }
+        }
+
+        View task=find(v->"Minimize Pictures Library".equals(v.getContentDescription()));
+        check(task!=null,"Library has an Explorer taskbar button");
+        ui(()->check(task.performContextClick(),"Right-click opens Explorer Jump List"));
+        awaitNode("Open new Explorer window");
+        awaitNode(store.quickLaunch().contains("@files")?"Unpin from taskbar":"Pin to taskbar");
+        ui(home::onBackPressed);
+
+        flickTaskbar(task,3,14,false);
+        awaitNode("Open new Explorer window");
+        check(explorerWindow.isShown(),"A release-only flick does not tap or minimize the window");
+        ui(home::onBackPressed);
+
+        flickTaskbar(task,13,19,true);
+        awaitNode("Open new Explorer window");
+        ui(home::onBackPressed);
+
+        tap(task,700);
+        awaitNode("Window preview for Pictures Library");
+        ui(home::onBackPressed);
+        close("@files");
+
+        ui(()->home.open("@actioncenter"));
+        ActionCenter center=(ActionCenter)window("@actioncenter").body;
+        ui(()->text(center,"Start recording").performClick());
+        ui(()->home.open("@notes"));
+        ui(()->home.open("@actioncenter"));
+        ui(()->text(center,"Stop recording").performClick());
+        await(()->text(center,"Export report…")!=null,"Stopped report can be exported");
+        ui(()->text(center,"Review recorded steps…").performClick());
+        awaitNode("Recorded steps");
+        menuTap("Close");
+        close("@actioncenter");close("@notes");
+    }
+    private void flickTaskbar(View task,int dxDp,int riseDp,boolean withMove)throws Exception{
+        int dx=Aero.dp(home,dxDp),rise=Aero.dp(home,riseDp);
+        ui(()->task.requestRectangleOnScreen(new Rect(0,0,task.getWidth(),task.getHeight()),true));
+        Rect bounds=new Rect();
+        check(task.getGlobalVisibleRect(bounds)&&!bounds.isEmpty(),"Taskbar target is visible for flick input");
+        float x=bounds.exactCenterX(),y=bounds.exactCenterY();
+        long down=SystemClock.uptimeMillis();
+        input(down,MotionEvent.ACTION_DOWN,x,y);
+        Thread.sleep(28);
+        if(withMove)input(down,MotionEvent.ACTION_MOVE,x+dx*.8f,y-rise*.8f);
+        Thread.sleep(26);
+        input(down,MotionEvent.ACTION_UP,x+dx,y-rise);
+    }
+    private View openBackgroundPicker(VistaControlPanel control,String button,String title)throws Exception{
+        ActivityMonitor monitor=addMonitor(ExplorerPickerActivity.class.getName(),null,false);
+        tap(text(control,button),60);
+        Activity picker=waitForMonitorWithTimeout(monitor,8000);
+        check(picker instanceof ExplorerPickerActivity,"Wallpaper Browse opens Nth Explorer");
+        View pickerRoot=picker.getWindow().getDecorView();
+        await(()->picker.hasWindowFocus()&&text(pickerRoot,title)!=null,"Wallpaper picker shows its purpose");
+        return pickerRoot;
+    }
+    private void awaitExplorerTarget(View picker,String description)throws Exception{
+        Predicate<View> matches=v->description.equals(v.getContentDescription());
+        long[] nextScroll={0};
+        await(()->{
+            View target=find(picker,matches);
+            if(target!=null&&target.isEnabled())return true;
+            // ListView creates only visible rows. The portrait Preview Pane makes
+            // the listing shorter, so move through it as a user would.
+            if(SystemClock.uptimeMillis()>=nextScroll[0]){
+                View list=find(picker,v->v instanceof android.widget.AbsListView);
+                if(list!=null)list.performAccessibilityAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD,null);
+                nextScroll[0]=SystemClock.uptimeMillis()+350;
+            }
+            return false;
+        },"Explorer target: "+description);
+    }
+    private void clickPicker(View picker,String description)throws Exception{
+        awaitExplorerTarget(picker,description);
+        Predicate<View> matches=v->description.equals(v.getContentDescription());
+        java.util.concurrent.atomic.AtomicBoolean clicked=new java.util.concurrent.atomic.AtomicBoolean();
+        ui(()->{
+            View target=find(picker,matches);
+            if(target instanceof CheckBox){
+                boolean checked=((CheckBox)target).isChecked();
+                target.performClick();
+                clicked.set(((CheckBox)target).isChecked()!=checked);
+            }else if(target!=null)clicked.set(target.performClick());
+        });
+        check(clicked.get(),"Click Explorer target: "+description);
     }
     private void graphs()throws Exception{
         progress("real monitor metrics, animated interpolation, reduced motion and pause");ui(()->home.open("@taskmanager"));TaskManagerPanel panel=(TaskManagerPanel)window("@taskmanager").body;tap(find(panel,v->"Task Manager Performance".equals(v.getContentDescription())),60);int count=panel.sampleCount();await(()->panel.sampleCount()>count,"Actual CPU/memory sampling advances");check(panel.animatedGraphCount()==0,"Reduced motion leaves graph static");shell("settings put global animator_duration_scale 1");store.prefs.edit().putBoolean("reduce_motion",false).commit();await(()->panel.animatedGraphCount()>0,"Real samples animate with motion enabled");shot("vista-taskmanager-graphs.png");tap(text(panel,"View"),60);menuTap("Pause updates");int paused=panel.sampleCount();Thread.sleep(2300);check(paused==panel.sampleCount()&&panel.animatedGraphCount()==0,"Paused counters and animations stop");tap(find(panel,v->"Task Manager Processes".equals(v.getContentDescription())),60);check(find(panel,v->v instanceof TextView&&((TextView)v).getText().toString().contains("PID "+android.os.Process.myPid()))!=null,"Real process PID is shown");tap(find(panel,v->"Task Manager Networking".equals(v.getContentDescription())),60);check(find(panel,v->"Device received traffic history".equals(v.getContentDescription()))!=null,"Native network graph exists");close("@taskmanager");store.prefs.edit().putBoolean("reduce_motion",true).commit();shell("settings put global animator_duration_scale 0");
@@ -227,14 +377,14 @@ public final class FidelitySmoke extends Instrumentation {
     }
 
     private void folders()throws Exception{
-        progress("separate folder windows and physical cross-window copy/move");File destination=new File(folder,"Destination");check(destination.mkdir(),"Destination exists");byte[] bytes="Drag preserves real bytes — café".getBytes(StandardCharsets.UTF_8);File source=new File(folder,"Source.txt");try(FileOutputStream out=new FileOutputStream(source)){out.write(bytes);}String page=DocumentFolders.rootPage(StorageAccess.tree().toString(),"Internal storage");page=DocumentFolders.childPage(page,DocumentOps.stat(home,StorageAccess.document("Documents"),new DocumentOps.Cancel()));page=DocumentFolders.childPage(page,DocumentOps.stat(home,StorageAccess.document("Documents/"+folder.getName()),new DocumentOps.Cancel()));String sourcePage=page;ui(()->home.open("@files"));VistaExplorer explorer=(VistaExplorer)window("@files").body;ui(()->explorer.navigate(sourcePage));await(()->find(explorer,v->"Destination".equals(v.getContentDescription()))!=null,"Real folder listing");tap(find(explorer,v->"Destination".equals(v.getContentDescription())),700);menuTap("Open in new window");await(()->find(v->v instanceof DesktopWindow&&((DesktopWindow)v).toolId.startsWith("@explorer:"))!=null,"Creates separate Explorer");DesktopWindow second=(DesktopWindow)find(v->v instanceof DesktopWindow&&((DesktopWindow)v).toolId.startsWith("@explorer:"));VistaExplorer target=(VistaExplorer)second.body;await(()->find(target,v->"Empty folder".equals(v.getContentDescription()))!=null,"Independent destination path");await(()->find(v->"Folder windows, 2 windows".equals(v.getContentDescription()))!=null,"Explorer family grouped");tap(find(v->"Folder windows, 2 windows".equals(v.getContentDescription())),700);
+        progress("separate folder windows and physical cross-window copy/move");File destination=new File(folder,"Destination");check(destination.mkdir(),"Destination exists");byte[] bytes="Drag preserves real bytes — café".getBytes(StandardCharsets.UTF_8);File source=new File(folder,"Source.txt");try(FileOutputStream out=new FileOutputStream(source)){out.write(bytes);}String page=DocumentFolders.rootPage(StorageAccess.tree().toString(),"Internal storage");page=DocumentFolders.childPage(page,DocumentOps.stat(home,StorageAccess.document("Pictures"),new DocumentOps.Cancel()));page=DocumentFolders.childPage(page,DocumentOps.stat(home,StorageAccess.document("Pictures/"+folder.getName()),new DocumentOps.Cancel()));String sourcePage=page;ui(()->home.open("@files"));VistaExplorer explorer=(VistaExplorer)window("@files").body;ui(()->explorer.navigate(sourcePage));await(()->find(explorer,v->"Destination".equals(v.getContentDescription()))!=null,"Real folder listing");tap(find(explorer,v->"Destination".equals(v.getContentDescription())),700);menuTap("Open in new window");await(()->find(v->v instanceof DesktopWindow&&((DesktopWindow)v).toolId.startsWith("@explorer:"))!=null,"Creates separate Explorer");DesktopWindow second=(DesktopWindow)find(v->v instanceof DesktopWindow&&((DesktopWindow)v).toolId.startsWith("@explorer:"));VistaExplorer target=(VistaExplorer)second.body;await(()->find(target,v->"Empty folder".equals(v.getContentDescription()))!=null,"Independent destination path");await(()->find(v->"Folder windows, 2 windows".equals(v.getContentDescription()))!=null,"Explorer family grouped");tap(find(v->"Folder windows, 2 windows".equals(v.getContentDescription())),700);
         String firstCaption=window("@files").caption();
         awaitNode("Switch to "+firstCaption);awaitNode("Switch to Destination");
         Thread.sleep(650);
         check(node("Switch to "+firstCaption)!=null&&node("Switch to Destination")!=null,"Both previews remain available through a refresh");
         shot("seven-folder-previews.png");menuTap("Switch to Destination");check(second.active(),"Group switches to actual selected folder window");
-        ui(()->home.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE));await(()->root.getWidth()>root.getHeight(),"Landscape ready");ui(()->{ViewGroup area=(ViewGroup)second.getParent();int width=area.getWidth()/2,height=area.getHeight();window("@files").arrange(0,0,width,height);second.arrange(width,0,width,height);});Thread.sleep(300);await(()->find(explorer,v->"Drag Source.txt".equals(v.getContentDescription()))!=null,"Source icon supports drag");drag(find(explorer,v->"Drag Source.txt".equals(v.getContentDescription())),find(target,v->"Folder contents".equals(v.getContentDescription())));menuTap("Copy here");File copied=new File(destination,"Source.txt");await(()->copied.isFile()&&copied.length()==bytes.length,"Actual drag writes the full copy");check(source.isFile()&&Arrays.equals(bytes,readFile(copied)),"Copy keeps source and exact bytes");shot("vista-folder-windows.png");
-        File moveSource=new File(folder,"Move.txt");try(FileOutputStream out=new FileOutputStream(moveSource)){out.write(bytes);}ui(explorer::refreshFiles);await(()->find(explorer,v->"Drag Move.txt".equals(v.getContentDescription()))!=null,"Move source visible");drag(find(explorer,v->"Drag Move.txt".equals(v.getContentDescription())),find(target,v->"Folder contents".equals(v.getContentDescription())));menuTap("Move here");File moved=new File(destination,"Move.txt");await(()->moved.isFile()&&!moveSource.exists(),"Verified drag move completes");check(Arrays.equals(bytes,readFile(moved)),"Move preserves exact bytes");
+        ui(()->home.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE));await(()->root.getWidth()>root.getHeight(),"Landscape ready");ui(()->{ViewGroup area=(ViewGroup)second.getParent();int width=area.getWidth()/2,height=area.getHeight();window("@files").arrange(0,0,width,height);second.arrange(width,0,width,height);});Thread.sleep(300);awaitExplorerTarget(explorer,"Drag Source.txt");drag(find(explorer,v->"Drag Source.txt".equals(v.getContentDescription())),find(target,v->"Folder contents".equals(v.getContentDescription())));menuTap("Copy here");File copied=new File(destination,"Source.txt");await(()->copied.isFile()&&copied.length()==bytes.length,"Actual drag writes the full copy");check(source.isFile()&&Arrays.equals(bytes,readFile(copied)),"Copy keeps source and exact bytes");shot("vista-folder-windows.png");
+        File moveSource=new File(folder,"Move.txt");try(FileOutputStream out=new FileOutputStream(moveSource)){out.write(bytes);}ui(explorer::refreshFiles);awaitExplorerTarget(explorer,"Drag Move.txt");drag(find(explorer,v->"Drag Move.txt".equals(v.getContentDescription())),find(target,v->"Folder contents".equals(v.getContentDescription())));menuTap("Move here");File moved=new File(destination,"Move.txt");await(()->moved.isFile()&&!moveSource.exists(),"Verified drag move completes");check(Arrays.equals(bytes,readFile(moved)),"Move preserves exact bytes");
         ui(()->{home.open("@files");explorer.navigate(sourcePage);});await(()->find(explorer,v->"Destination".equals(v.getContentDescription()))!=null,"Source folder refreshed");tap(find(explorer,v->"Destination".equals(v.getContentDescription())),700);menuTap("Add desktop shortcut");await(()->FolderLinks.list(store).length()>0,"Real folder shortcut saved");check(destination.isDirectory(),"Adding shortcut leaves source intact");DesktopBackup.Plan backup=DesktopBackup.parse(DesktopBackup.snapshot(store).toString());check(backup.string("folder_links","{}").contains("Destination")&&backup.string("taskbar_grouping","").equals("Always"),"Validated backup retains folder links and grouping");String secondId=second.toolId,destinationPage=target.page();MainActivity old=home;resumed.clear();ui(home::recreate);long until=SystemClock.uptimeMillis()+12000;MainActivity next=null;while(SystemClock.uptimeMillis()<until){MainActivity candidate=resumed.poll(300,TimeUnit.MILLISECONDS);if(candidate!=null&&candidate!=old){next=candidate;break;}}check(next!=null,"Real Activity recreation completed");home=next;root=home.getWindow().getDecorView();await(()->window("@files")!=null&&window(secondId)!=null,"Both separate folder windows restored");await(()->((VistaExplorer)window("@files").body).page().equals(sourcePage)&&((VistaExplorer)window(secondId).body).page().equals(destinationPage),"Folder windows restore independent navigation");
     }
     private void drag(View source,View destination)throws Exception{check(source!=null&&destination!=null,"Drag source and destination exist");ui(()->source.requestRectangleOnScreen(new Rect(0,0,source.getWidth(),source.getHeight()),true));Thread.sleep(200);Rect from=new Rect(),to=new Rect();check(source.getGlobalVisibleRect(from)&&destination.getGlobalVisibleRect(to),"Both drag windows have visible targets");long down=SystemClock.uptimeMillis();input(down,MotionEvent.ACTION_DOWN,from.exactCenterX(),from.exactCenterY());Thread.sleep(750);for(int i=1;i<=20;i++){input(down,MotionEvent.ACTION_MOVE,from.exactCenterX()+(to.exactCenterX()-from.exactCenterX())*i/20,from.exactCenterY()+(to.exactCenterY()-from.exactCenterY())*i/20);Thread.sleep(30);}input(down,MotionEvent.ACTION_UP,to.exactCenterX(),to.exactCenterY());Thread.sleep(250);}
@@ -259,8 +409,15 @@ public final class FidelitySmoke extends Instrumentation {
         }
         return null;
     }private AccessibilityNodeInfo node(AccessibilityNodeInfo n,String text){if(n==null)return null;if(text.contentEquals(n.getText()==null?"":n.getText())||text.contentEquals(n.getContentDescription()==null?"":n.getContentDescription()))return n;for(int i=0;i<n.getChildCount();i++){AccessibilityNodeInfo r=node(n.getChild(i),text);if(r!=null)return r;}return null;}
-    private void ui(Runnable r){runOnMainSync(r);try{Thread.sleep(80);}catch(InterruptedException e){throw new AssertionError(e);}}
-    private void await(BooleanSupplier condition,String text)throws Exception{long end=SystemClock.uptimeMillis()+12000;while(SystemClock.uptimeMillis()<end){boolean[] ready={false};runOnMainSync(()->ready[0]=condition.getAsBoolean());if(ready[0])return;Thread.sleep(100);}throw new AssertionError(text);}
+    private void onMain(Runnable work){
+        Throwable[] failure={null};
+        runOnMainSync(()->{try{work.run();}catch(Throwable caught){failure[0]=caught;}});
+        if(failure[0] instanceof Error)throw (Error)failure[0];
+        if(failure[0] instanceof RuntimeException)throw (RuntimeException)failure[0];
+        if(failure[0]!=null)throw new AssertionError(failure[0]);
+    }
+    private void ui(Runnable r){onMain(r);try{Thread.sleep(80);}catch(InterruptedException e){throw new AssertionError(e);}}
+    private void await(BooleanSupplier condition,String text)throws Exception{long end=SystemClock.uptimeMillis()+12000;while(SystemClock.uptimeMillis()<end){boolean[] ready={false};onMain(()->ready[0]=condition.getAsBoolean());if(ready[0])return;Thread.sleep(100);}throw new AssertionError(text);}
     private String shell(String command)throws Exception{try(ParcelFileDescriptor fd=getUiAutomation().executeShellCommand(command);InputStream in=new ParcelFileDescriptor.AutoCloseInputStream(fd);ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] buffer=new byte[4096];int n;while((n=in.read(buffer))!=-1)out.write(buffer,0,n);return out.toString("UTF-8");}}
     private void shot(String name)throws Exception{getUiAutomation().waitForIdle(150,2500);Bitmap image=getUiAutomation().takeScreenshot();check(image!=null,"Screenshot available");try(FileOutputStream out=getTargetContext().openFileOutput(name,0)){image.compress(Bitmap.CompressFormat.PNG,100,out);}image.recycle();}
     private void dump(AccessibilityNodeInfo n,StringBuilder out,int depth){if(n==null||depth>24)return;out.append(depth).append(' ').append(n.getText()).append(" / ").append(n.getContentDescription()).append('\n');for(int i=0;i<n.getChildCount();i++)dump(n.getChild(i),out,depth+1);}

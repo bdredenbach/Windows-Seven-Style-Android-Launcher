@@ -14,6 +14,7 @@ import android.os.Bundle;
 import android.os.SystemClock;
 import android.view.InputDevice;
 import android.view.MotionEvent;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
@@ -51,10 +52,12 @@ public final class SnapSmoke extends Instrumentation {
             target.getSharedPreferences(StartupExperience.SESSION, Context.MODE_PRIVATE).edit()
                     .putBoolean("seen", true).putBoolean("welcome_seen", true)
                     .putBoolean(StartupExperience.HOME_OFFERED, true).commit();
+            progress("launching Seven for native Snap checks");
             home = (MainActivity) startActivitySync(new Intent(Intent.ACTION_MAIN)
                     .setComponent(new ComponentName(target, MainActivity.class))
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             root = home.getWindow().getDecorView();
+            progress("laying out Explorer in landscape");
             rotate(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
             runOnMainSync(() -> home.open("@computer"));
             settle();
@@ -68,12 +71,13 @@ public final class SnapSmoke extends Instrumentation {
             runOnMainSync(left::maximize);
             settle();
             Rect work = new Rect(0, (int) left.getY(), workspace.getWidth(), workspace.getHeight());
-            check(work.width() / 2 >= dp(240), "Landscape leaves room for two Explorer windows");
+            check(work.width() / 2 >= dp(AeroSnap.MIN_SIDE_WIDTH_DP), "Landscape leaves room for two Explorer windows");
             runOnMainSync(() -> left.arrange(dp(25), dp(55), dp(300), dp(230)));
             settle();
             Rect floating = bounds(left);
             int edgeY = work.centerY();
             Rect leftHalf = new Rect(0, work.top, work.right / 2, work.bottom);
+            progress("dragging and cancelling the left Snap preview");
             begin(left);
             moveTo(dp(12), edgeY);
             settle();
@@ -89,6 +93,7 @@ public final class SnapSmoke extends Instrumentation {
             check(floating.equals(bounds(left)), "Cancel restores the original floating bounds");
             checkPreview(left, null, "Cancel removes the outline");
 
+            progress("snapping both Explorer windows side by side");
             drag(left, dp(12), edgeY);
             check(leftHalf.equals(bounds(left)), "Left window fills the exact left half");
             runOnMainSync(() -> home.open("@files"));
@@ -146,6 +151,7 @@ public final class SnapSmoke extends Instrumentation {
             doubleTap(title(left));
             check(moved.equals(bounds(left)), "Title-bar double-tap restores");
 
+            progress("checking portrait Snap, Shake and keyboard controls");
             rotate(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
             runOnMainSync(() -> sidebar.visible(false));
             settle();
@@ -154,13 +160,31 @@ public final class SnapSmoke extends Instrumentation {
             Rect portrait = bounds(left);
             int portraitCenter = workspace.getWidth() / 2;
             drag(left, dp(12), workspace.getHeight() / 2);
-            boolean canSplit = workspace.getWidth() / 2 >= dp(240);
+            boolean canSplit = workspace.getWidth() / 2 >= dp(AeroSnap.MIN_SIDE_WIDTH_DP);
             check(left.geometry().has("snap") == canSplit, "Portrait side snap requires usable halves");
             if (!canSplit) check(left.getWidth() == portrait.width(), "Narrow portrait preserves floating size");
+            else {
+                check(bounds(left).left==0&&bounds(left).right==portraitCenter,"Portrait left half has exact bounds");
+                runOnMainSync(()->{right.arrange(dp(20),dp(72),dp(290),dp(250));right.restore();});
+                settle();
+                drag(right,workspace.getWidth()-dp(5),workspace.getHeight()/2);
+                check(bounds(right).left==portraitCenter&&bounds(right).right==workspace.getWidth(),"Portrait right half has exact bounds");
+                check(title(left).getWidth()>=dp(20)&&title(right).getWidth()>=dp(20),"Both portrait halves retain a usable title grip");
+            }
             drag(left, portraitCenter, dp(12));
+            long topReady=SystemClock.uptimeMillis()+4000;
+            while(!(left.maximized()&&left.getWidth()==workspace.getWidth()&&bounds(left).bottom==workspace.getHeight())&&SystemClock.uptimeMillis()<topReady)Thread.sleep(40);
             check(left.maximized() && left.getWidth() == workspace.getWidth()
-                    && bounds(left).bottom == workspace.getHeight(), "Top snap works in portrait");
-            result.putString("stream", "PASS: Aero Snap preview, side-by-side Explorer focus, top snap, drag-away, cancel, window controls and portrait limits.\n");
+                    && bounds(left).bottom == workspace.getHeight(), "Top snap works in portrait; actual="+bounds(left)+", geometry="+left.geometry());
+            shake(left);
+            check(left.isShown()&&!right.isShown(),"Aero Shake minimizes the other visible window");
+            shake(left);
+            check(left.isShown()&&right.isShown(),"The second Aero Shake restores the same window");
+            runOnMainSync(()->left.restore());
+            runOnMainSync(()->home.dispatchKeyEvent(new KeyEvent(0,0,KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DPAD_RIGHT,0,KeyEvent.META_META_ON)));
+            settle();
+            if(canSplit)check(bounds(left).left==portraitCenter,"Super+Right uses the same snap geometry");
+            result.putString("stream", "PASS: Aero Snap preview, side-by-side Explorer focus, top snap, drag-away, cancel, window controls, portrait halves, Aero Shake and keyboard Snap.\n");
             status = Activity.RESULT_OK;
         } catch (Throwable failure) {
             try { saveScreenshot("aero-snap-failure"); } catch (Exception ignored) {}
@@ -208,6 +232,20 @@ public final class SnapSmoke extends Instrumentation {
         settle();
     }
 
+    private void shake(DesktopWindow window)throws Exception{
+        begin(window);
+        int start=pointerX,y=pointerY;
+        int right=start+dp(49),left=start-dp(49);
+        long gestureTime=down;
+        for(int x:new int[]{right,left,right,left}){
+            // Preserve the user's gesture cadence when synchronous emulator delivery is slow.
+            Thread.sleep(35);gestureTime+=35;
+            inputAt(MotionEvent.ACTION_MOVE,x,y,gestureTime);
+        }
+        inputAt(MotionEvent.ACTION_UP,left,y,gestureTime+1);
+        settle();
+    }
+
     private void moveTo(int x, int y) throws Exception {
         int startX = pointerX, startY = pointerY;
         for (int i = 1; i <= 6; i++) {
@@ -250,10 +288,11 @@ public final class SnapSmoke extends Instrumentation {
         settle();
     }
 
-    private void input(int action, int x, int y) {
+    private void input(int action, int x, int y) {inputAt(action,x,y,SystemClock.uptimeMillis());}
+    private void inputAt(int action,int x,int y,long eventTime){
         int[] origin = new int[2];
         workspace.getLocationOnScreen(origin);
-        MotionEvent event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action,
+        MotionEvent event = MotionEvent.obtain(down, eventTime, action,
                 origin[0] + x, origin[1] + y, 0);
         try {
             event.setSource(InputDevice.SOURCE_TOUCHSCREEN);
@@ -293,6 +332,8 @@ public final class SnapSmoke extends Instrumentation {
         Thread.sleep(100);
         waitForIdleSync();
     }
+
+    private void progress(String text){Bundle data=new Bundle();data.putString("stream","CHECK: "+text+"\n");sendStatus(0,data);}
 
     private int dp(int value) { return Aero.dp(home, value); }
 

@@ -2,6 +2,35 @@
 
 Nth Desktop Seven is a Windows 7–inspired Android home launcher. Its first test build, **0.1.0**, adds Aero Snap and installs alongside Nth Desktop Vista under the separate app ID `com.nthexperience.desktop.seven`.
 
+**0.6.1** keeps the tray within its actual available width during inset and keyboard transitions, using the same sizing budget in measurement and layout. It contains all of the 0.6.0 finishing touches below and updates the same Seven installation.
+
+**0.6.0** completes the Seven interaction pass:
+
+- Briefly press a taskbar icon, then drag sideways to reorder. Quick horizontal swipes still scroll, upward flicks open Jump Lists, and stationary holds show previews. Order survives restarts; Ctrl+Shift+Left/Right and accessibility actions also move icons.
+- Taskbar hot tracking uses the icon's dominant color while respecting glass opacity. Caption controls use consistent drawn glyphs, with shared Seven toolbar and menu highlights.
+- Hold the far-right Show desktop strip for temporary hollow-window Aero Peek. Release or cancel to restore contents; a short tap still toggles the desktop. Mouse hover also Peeks. Window geometry, minimized states and private-preview rules are preserved.
+- Four original offline sound schemes provide completion, error and notification cues. Test buttons preview without enabling automatic sounds. Schemes follow themes and portable theme files; older theme files remain compatible. Android silent mode, Do Not Disturb, system volume and active media are respected.
+- The Action Center flag opens a compact flyout for actual Nth file/backup notices and lost linked-folder access, with links to the full Action Center. Optional Home and file-access setup choices do not create warnings.
+
+The signed 0.6.0 APK updates the original Seven 0.5.12 installation in place. Android apps continue to open through Android; floating windows and Peek apply to Nth's built-in tools.
+
+**0.5.12** adds resizing from any corner of built-in windows. The opposite corner stays anchored and dimensions are saved for each orientation. Resizing a snapped window returns it to a floating size. Maximize and Restore retain the resized dimensions.
+
+Usage Access setup remains available during first launch, Welcome Center and Taskbar settings. Returning from Android Settings without a grant reopens the guide. Start menu rows show an icon and label.
+
+**0.5.1** recognizes short upward flicks on taskbar icons, including quick gestures that report most of their movement at release. Hold an icon to see window previews.
+
+**0.5.0** adds phone-width Aero Snap, title-bar Aero Shake, Jump Lists, media controls on previews, taskbar progress, multi-folder Libraries, Explorer previews, portable My Themes, and a tray Action Center with Steps Recorder.
+
+- Drag a title bar to a side edge, or use **Window menu → Snap left / Snap right**. The Super key and arrow keys provide keyboard Snap where Android passes the shortcut through.
+- Swipe up on a taskbar button or right-click it to open a Jump List. Hold the taskbar button for window previews.
+- In Explorer, use **Include in library…** on a folder, then **Manage library locations…** to choose the default save location. The Preview Pane button or **Alt+P** opens image and text previews.
+- Open **Personalization → My Themes** to save the current look and export an Nth theme with its pictures. Open the tray flag to review launcher alerts or export an opt-in Steps Recorder report.
+
+**0.4.2** browses for desktop background pictures and slideshow folders in Nth Explorer. Use device storage or a linked folder and apply your selection with Save changes. Android handles the permission prompt when you connect a new folder.
+
+**0.4.1** fixes the first render of Flip 3D for small window stacks.
+
 **0.4.0** opens taskbar previews on a hold, adds mouse Aero Peek, and keeps Explorer and shortcut folders in the same taskbar family. Flip 3D works with a desktop-only stack and is searchable from Start. Double-click a gadget to add it to the right edge. Personalization adds seven original backgrounds, new themes, and a checked picture gallery with folder browsing, timed rotation and shuffle.
 
 **0.3.0** groups Explorer windows into one stacked taskbar button by default. Hold it to see updating thumbnails and choose a window. Start has a raised profile picture, and the taskbar shows the time above the date. Personalization offers theme previews and the desktop context menu changes the wallpaper. Gadgets can be placed or resized directly on the desktop.
@@ -12,7 +41,7 @@ Nth Desktop Seven is a Windows 7–inspired Android home launcher. Its first tes
 
 - Drag an Nth window by its title bar to the top to maximize it, or to the left or right to fill that half of the usable desktop.
 - The blue outline shows where the window will land. Drag a snapped window away by its title bar to restore its previous floating size.
-- Side snap requires 240 dp of width per window and 190 dp of usable height. The work area accounts for the taskbar, system insets and any space reserved for an always-on-top Sidebar.
+- Side snap requires 160 dp of width per window and 190 dp of usable height. The work area accounts for the taskbar, system insets and any space reserved for an always-on-top Sidebar.
 - Android grants Seven its own file access. Desktop settings, media libraries and Recycle Bin entries belong to each app's install.
 
 Seven starts from [Vista 0.24.0 at commit `7c3fd10`](https://github.com/bdredenbach/Windows-Vista-Style-Android-Launcher/commit/7c3fd109ac1fae51486c8f645b5f7cba7370bdeb). Use `./gradlew :app:assembleDebug` to build it. Android 11 and Android 16 emulator checks cover the inherited tools, side-by-side installation and title-bar gestures.
@@ -25,7 +54,7 @@ A Vista-style Android home launcher by Nth Experience. **0.22.0 — Vista finish
 
 **Explorer:** hold a file/folder icon to drag it into a folder or another Explorer window; choose Copy here or Move here. Moves retain the existing byte-verification path before original deletion. Hold its name for the context menu, including Open in new window and Add desktop shortcut. Dropping a directory on the desktop creates a link; files remain in place. Up to 12 Explorer windows keep separate paths and view state. Taskbar Properties chooses Never, When full or Always grouping; a group opens real window snapshots and individual switching/closing controls.
 
-**Desktop Background:** Personalization offers thumbnail previews, Browse for a picture through Android's document picker, Fill/Fit/Stretch/Tile/Center, background colours, Save changes and Cancel changes. Preview does not apply until saved. Selected picture references and positions are backed up; Android permission grants are not transferred.
+**Desktop Background:** Personalization offers thumbnail previews, Fill/Fit/Stretch/Tile/Center, background colours, Save changes and Cancel changes. In Seven, both Browse buttons use Nth Explorer. Preview does not apply until saved. Selected picture references and positions are backed up; Android permission grants are not transferred.
 
 Expand the notification area and tap the **Task Manager** icon to open Task Manager. Hold the taskbar grip and choose **Switch Windows** for snapshots of actual Nth windows. Mouse hover previews are optional; InPrivate browser windows never show previews. Android apps have labelled launch entries. Tap the **sun** for Nth-only brightness or explicitly enable Android's Modify system settings access for whole-phone control. Adjusting whole-phone brightness selects manual mode; Follow phone brightness removes the Nth override.
 
@@ -145,7 +174,7 @@ The Start menu uses a white program pane, charcoal glass navigation pane, profil
 
 Apps opened from Nth receive icon-and-label buttons in its taskbar. Press Android Home to return to Nth, then tap the desired button to switch back. Android controls task restoration; a button does not prove the app is still running. Hold a button to switch, remove it, or open Taskbar Properties. Removal does not close the app. Buttons last for the current launcher process and are bounded to 32; they are not backed up. This taskbar is inside Nth, not an overlay on other apps.
 
-**Control Panel → Taskbar and Start Menu → Include apps opened outside Nth Desktop** is off by default. Enabling it opens Android's Usage Access screen when needed. With that separate permission, Nth reads recent foreground events when returning to the desktop to add launchable app buttons. It uses no background service and saves no usage history. Turning it off or revoking permission removes observation-only buttons; directly opened app buttons remain. This device-specific opt-in is excluded from backups.
+**Control Panel → Taskbar and Start Menu → Include apps opened outside Nth Desktop** is off by default. The checkbox opens Seven’s Usage Access switch where Android supports the direct link. If Android blocks access, **Open App info** leads to its **Allow restricted settings** menu. Press Back to continue to the Usage Access switch, then return to Seven to finish enabling the checkbox. With that separate permission, Nth reads recent foreground events when returning to the desktop to add launchable app buttons. It uses no background service and saves no usage history. Turning it off or revoking permission removes observation-only buttons; directly opened app buttons remain. This device-specific opt-in is excluded from backups.
 
 Click the Start profile picture, or open **Control Panel → User Accounts → Change your desktop name**, to choose a picture. Nth copies a centered 256px WebP portrait into its private settings. That small copy is included in backups and does not depend on keeping the original image accessible. “Use the Nth picture” restores the original orb.
 
@@ -185,7 +214,9 @@ These are native built-in desktop gadgets. This release does not yet host third-
 
 ## Install and update
 
-Install the supplied test APK, then open **Nth Desktop**. Try it before choosing **Make home**. To switch back: **Android Settings → Apps → Default apps → Home app**. The 0.16.0 handoff APK uses the same preserved test signing key as the earlier supplied builds, so it can be installed as an update.
+The supplied Seven 0.6.1 test APK uses the original `com.nthexperience.desktop.seven` identity and the recovered Seven-specific test key, matching the original builds through 0.5.2. Open **Nth Desktop Seven**, then choose it under **Android Settings → Apps → Default apps → Home app** when ready.
+
+The later 0.5.3–0.5.11 Preview builds used `com.nthexperience.desktop.seven.preview` and a different key that is no longer available in this workspace. Version 0.5.12 cannot update that Preview install in place. Before switching, export its desktop backup through Control Panel → Backup and Restore, install 0.5.12, and restore the backup there. Keep Preview installed until the restored setup is verified. Android permissions and file access must be granted again; Recycle Bin contents and browser data are not included in desktop backups.
 
 Notes, selected photo references, linked folder references, file-manager shortcuts, preferences and cached forecasts are stored locally. Photo access uses the document picker's retained grants; device-wide shared-file browsing is an optional separate all-files grant. Approximate location is requested when you tap **Use my approximate location** or enable **Follow my location**. A city can be chosen without granting location access. Forecasts require Internet access; city search uses Photon/OSM. City search text is sent to that service. Selected weather coordinates are sent to MET Norway. Uninstalling clears local app data.
 

@@ -20,7 +20,7 @@ abstract class VistaShell extends LinearLayout {
     final TextView address,status,back,forward,up,folders;
     private final ArrayList<String> history=new ArrayList<>();
     private int historyIndex=-1;
-    private boolean restoring,ready,compact,keepFoldersButton,hideFoldersButton;private Boolean navigationOverride;private String navigationPreference;
+    private boolean restoring,ready,compact,veryNarrow,keepFoldersButton,hideFoldersButton;private Boolean navigationOverride;private String navigationPreference;
     private int pendingPosition=-1,pendingOffset;
     private boolean restoreFocus;
     VistaShell(Context c,DesktopStore store,Actions actions,String hint){
@@ -34,12 +34,13 @@ abstract class VistaShell extends LinearLayout {
         search=new EditText(c);search.setTypeface(Aero.face(c));search.setSingleLine(true);search.setTextSize(12);search.setTextColor(Aero.INK);search.setHintTextColor(0xff70818e);search.setHint(hint);search.setContentDescription(hint);search.setPadding(dp(7),0,dp(5),0);search.setBackground(Aero.panel(c,0xffffffff,0xfffafcfd,1,0xff9aafbf));LayoutParams query=new LayoutParams(0,dp(30),1);query.setMargins(dp(5),0,0,0);toolbar.addView(search,query);addView(toolbar,new LayoutParams(-1,dp(38)));
         LinearLayout area=new LinearLayout(c);side=new LinearLayout(c);side.setOrientation(VERTICAL);side.setPadding(dp(10),dp(12),dp(8),dp(8));side.setBackground(Aero.panel(c,0xffeff5fa,0xffdbe7f1,0,0xffbacbd8));sideScroll=new ScrollView(c);sideScroll.setFillViewport(true);sideScroll.setVerticalScrollBarEnabled(false);sideScroll.addView(side);area.addView(sideScroll,new LayoutParams(dp(136),-1));content=new FrameLayout(c);content.setBackgroundColor(Color.WHITE);area.addView(content,new LayoutParams(0,-1,1));addView(area,new LayoutParams(-1,0,1));
         status=Aero.text(c,"",11,0xff425d71);status.setPadding(dp(9),0,dp(6),0);status.setSingleLine(true);status.setEllipsize(TextUtils.TruncateAt.END);status.setBackground(Aero.panel(c,0xffedf4fa,0xffdce8f2,0,0xffb1c3d1));addView(status,new LayoutParams(-1,dp(28)));
-        addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{status.setVisibility(b-t<dp(250)?GONE:VISIBLE);boolean next=r-l<dp(490);if(!ready||next!=compact){compact=next;sideScroll.setVisibility(navigationOverride==null?(compact?GONE:VISIBLE):navigationOverride?VISIBLE:GONE);folders.setVisibility(!hideFoldersButton&&(keepFoldersButton||compact)?VISIBLE:GONE);if(ready)render();}});
+        addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{status.setVisibility(b-t<dp(250)?GONE:VISIBLE);boolean next=r-l<dp(490),narrow=r-l<dp(240);if(!ready||next!=compact||narrow!=veryNarrow){compact=next;veryNarrow=narrow;updateNavigationPane();folders.setVisibility(!hideFoldersButton&&(keepFoldersButton||compact)?VISIBLE:GONE);if(ready)render();}});
         search.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int n,int f){}public void afterTextChanged(Editable e){}public void onTextChanged(CharSequence s,int start,int before,int count){if(ready&&!restoring)render();}});
     }
-    final void enableNavigationToggle(){navigationPreference="explorer_navigation";navigationOverride=store.prefs.getBoolean(navigationPreference,true);sideScroll.setVisibility(navigationOverride?VISIBLE:GONE);keepFoldersButton=true;folders.setVisibility(VISIBLE);folders.setOnClickListener(v->toggleNavigationPane());}
+    private void updateNavigationPane(){sideScroll.setVisibility(!veryNarrow&&(navigationOverride==null?!compact:navigationOverride)?VISIBLE:GONE);}
+    final void enableNavigationToggle(){navigationPreference="explorer_navigation";navigationOverride=store.prefs.getBoolean(navigationPreference,true);updateNavigationPane();keepFoldersButton=true;folders.setVisibility(VISIBLE);folders.setOnClickListener(v->toggleNavigationPane());}
     final boolean navigationPaneVisible(){return sideScroll.getVisibility()==VISIBLE;}
-    final void toggleNavigationPane(){navigationOverride=!navigationPaneVisible();if(navigationPreference!=null)store.prefs.edit().putBoolean(navigationPreference,navigationOverride).apply();sideScroll.setVisibility(navigationOverride?VISIBLE:GONE);if(ready)render();}
+    final void toggleNavigationPane(){if(veryNarrow){showFolders();return;}navigationOverride=!navigationPaneVisible();if(navigationPreference!=null)store.prefs.edit().putBoolean(navigationPreference,navigationOverride).apply();updateNavigationPane();if(ready)render();}
     final void useCompactExplorerToolbar(){
         hideFoldersButton=true;
         folders.setVisibility(GONE);
@@ -53,8 +54,8 @@ abstract class VistaShell extends LinearLayout {
     final View explorerChrome(java.util.function.Consumer<String> menu){
         LinearLayout classic=new LinearLayout(getContext());classic.setBackground(Aero.panel(getContext(),0xfffcfcfc,0xffe4e8ed,0,0xffafb9c2));
         for(String label:new String[]{"File","Edit","View","Tools","Help"}){TextView item=command(label,()->menu.accept(label));item.setContentDescription(label+" menu");classic.addView(item,new LayoutParams(-2,dp(26)));}addView(classic,1,new LayoutParams(-1,dp(27)));
-        ((ViewGroup)commands.getParent()).setBackground(Aero.gloss(getContext(),new int[]{0xff567d94,0xff2d536b,0xff173e56,0xff346077},0,0xff7c9bae));folders.setTextColor(Color.WHITE);
-        for(int i=0;i<commands.getChildCount();i++)if(commands.getChildAt(i) instanceof TextView)((TextView)commands.getChildAt(i)).setTextColor(Color.WHITE);
+        ((ViewGroup)commands.getParent()).setBackground(Aero.gloss(getContext(),new int[]{0xfff6faff,0xffe7eff8,0xffd6e3f1,0xffedf4fb},0,0xffb5c8da));folders.setTextColor(0xff263f54);
+        for(int i=0;i<commands.getChildCount();i++)if(commands.getChildAt(i) instanceof TextView)((TextView)commands.getChildAt(i)).setTextColor(0xff263f54);
         for(TextView button:new TextView[]{back,forward})button.setBackground(Aero.gloss(getContext(),new int[]{0xffeaf7ff,0xffa9c9df,0xff7397b3,0xffc9e0ee},16,0xff839baa));
         return classic;
     }
@@ -88,7 +89,7 @@ abstract class VistaShell extends LinearLayout {
     }
     final void restore(JSONObject value){
         if(value==null)return;restoring=true;JSONArray saved=value.optJSONArray("history");if(saved!=null&&saved.length()>0){history.clear();for(int i=0;i<Math.min(16,saved.length());i++)history.add(saved.optString(i,"home"));historyIndex=Math.max(0,Math.min(history.size()-1,value.optInt("index")));}
-        int nav=value.optInt("navigation",-1);if(navigationPreference!=null)navigationOverride=Boolean.valueOf(store.prefs.getBoolean(navigationPreference,true));else navigationOverride=nav<0?null:Boolean.valueOf(nav==1);sideScroll.setVisibility(navigationOverride==null?(compact?GONE:VISIBLE):navigationOverride?VISIBLE:GONE);restoreExtra(value.optJSONObject("extra"));search.setText(value.optString("query"));search.setSelection(Math.max(0,Math.min(search.length(),value.optInt("cursor"))));restoreFocus=value.optBoolean("focus");pendingPosition=value.optInt("position",0);pendingOffset=value.optInt("offset");restoring=false;render();updateNavigation();if(restoreFocus)search.requestFocus();
+        int nav=value.optInt("navigation",-1);if(navigationPreference!=null)navigationOverride=Boolean.valueOf(store.prefs.getBoolean(navigationPreference,true));else navigationOverride=nav<0?null:Boolean.valueOf(nav==1);updateNavigationPane();restoreExtra(value.optJSONObject("extra"));search.setText(value.optString("query"));search.setSelection(Math.max(0,Math.min(search.length(),value.optInt("cursor"))));restoreFocus=value.optBoolean("focus");pendingPosition=value.optInt("position",0);pendingOffset=value.optInt("offset");restoring=false;render();updateNavigation();if(restoreFocus)search.requestFocus();
     }
     final void body(View view){content.removeAllViews();content.addView(view,new FrameLayout.LayoutParams(-1,-1));if(pendingPosition>=0){final int position=pendingPosition,offset=pendingOffset;view.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener(){public void onGlobalLayout(){view.getViewTreeObserver().removeOnGlobalLayoutListener(this);View target=scrollTarget(view);if(target instanceof ListView)((ListView)target).setSelectionFromTop(position,offset);else if(target instanceof AbsListView)((AbsListView)target).setSelection(position);else if(target!=null)target.scrollTo(0,offset);}});pendingPosition=-1;}}
     final void loading(View view){content.removeAllViews();content.addView(view,new FrameLayout.LayoutParams(-1,-1));}

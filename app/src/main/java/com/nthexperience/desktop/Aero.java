@@ -33,6 +33,7 @@ final class Aero {
     static StateListDrawable selection(Context c){
         StateListDrawable states=new StateListDrawable();
         states.addState(new int[]{android.R.attr.state_pressed},gloss(c,new int[]{0xfff0faff,0xffd6eeff,0xffb6defa,0xffd9f1ff},3,0xff83b4d2));
+        states.addState(new int[]{android.R.attr.state_hovered},panel(c,0xfff1f9ff,0xffd9edfb,3,0xffb0cddd));
         states.addState(new int[]{android.R.attr.state_focused},panel(c,0xffedf8ff,0xffd4eaff,3,0xff97bcd3));
         states.addState(new int[]{},panel(c,0x00ffffff,0x00ffffff,3,0));return states;
     }
