@@ -235,7 +235,8 @@ public final class SnapSmoke extends Instrumentation {
         int start=pointerX,y=pointerY;
         int right=start+dp(49),left=start-dp(49);
         for(int x:new int[]{right,left,right,left}){
-            Thread.sleep(70);
+            // Leave headroom for synchronous input delivery on slower emulators.
+            Thread.sleep(35);
             input(MotionEvent.ACTION_MOVE,x,y);
         }
         input(MotionEvent.ACTION_UP,left,y);
