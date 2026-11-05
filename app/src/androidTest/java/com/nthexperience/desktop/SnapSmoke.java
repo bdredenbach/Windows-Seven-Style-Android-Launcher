@@ -236,12 +236,13 @@ public final class SnapSmoke extends Instrumentation {
         begin(window);
         int start=pointerX,y=pointerY;
         int right=start+dp(49),left=start-dp(49);
+        long gestureTime=down;
         for(int x:new int[]{right,left,right,left}){
-            // Leave headroom for synchronous input delivery on slower emulators.
-            Thread.sleep(35);
-            input(MotionEvent.ACTION_MOVE,x,y);
+            // Preserve the user's gesture cadence when synchronous emulator delivery is slow.
+            Thread.sleep(35);gestureTime+=35;
+            inputAt(MotionEvent.ACTION_MOVE,x,y,gestureTime);
         }
-        input(MotionEvent.ACTION_UP,left,y);
+        inputAt(MotionEvent.ACTION_UP,left,y,gestureTime+1);
         settle();
     }
 
@@ -287,10 +288,11 @@ public final class SnapSmoke extends Instrumentation {
         settle();
     }
 
-    private void input(int action, int x, int y) {
+    private void input(int action, int x, int y) {inputAt(action,x,y,SystemClock.uptimeMillis());}
+    private void inputAt(int action,int x,int y,long eventTime){
         int[] origin = new int[2];
         workspace.getLocationOnScreen(origin);
-        MotionEvent event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action,
+        MotionEvent event = MotionEvent.obtain(down, eventTime, action,
                 origin[0] + x, origin[1] + y, 0);
         try {
             event.setSource(InputDevice.SOURCE_TOUCHSCREEN);
