@@ -3,6 +3,7 @@ package com.nthexperience.desktop;
 import android.app.*;
 import android.content.*;
 import android.graphics.Bitmap;
+import android.graphics.Rect;
 import android.net.Uri;
 import android.os.*;
 import android.provider.DocumentsContract;
