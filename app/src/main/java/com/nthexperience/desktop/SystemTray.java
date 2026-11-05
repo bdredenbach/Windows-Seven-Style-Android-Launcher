@@ -26,7 +26,7 @@ final class SystemTray extends LinearLayout {
     private SeekBar volume;
     private Intent battery;
     private String page="";
-    private int leftInset,rightInset,restoreVolume;
+    private int leftInset,rightInset,restoreVolume,workspaceBudget;
     private final AeroIcon taskManager;
     private final TrayFlag actionCenter;private int alertCount=-1;
     private final SharedPreferences notices;
@@ -58,12 +58,14 @@ final class SystemTray extends LinearLayout {
         compactStatus=Aero.text(c,"⌃",21,Color.WHITE);compactStatus.setGravity(Gravity.CENTER);compactStatus.setContentDescription("Device controls");compactStatus.setFocusable(true);compactStatus.setBackground(Aero.selection(c));compactStatus.setOnClickListener(v->{expanded=!expanded;prefs.edit().putBoolean("tray_expanded",expanded).apply();updateIconVisibility();host.layout();});compactStatus.setOnLongClickListener(v->{show("controls");return true;});addView(compactStatus,0,new LayoutParams(dp(44),dp(48)));updateIconVisibility();
     }
     @Override protected void onMeasure(int widthSpec,int heightSpec){
-        fitWidth(dp(getResources().getConfiguration().screenWidthDp));
+        sizeIcons();
         super.onMeasure(widthSpec,heightSpec);
     }
-    void fitWidth(int workspaceWidth) {
-        // Configuration updates precede layout during rotation; never reuse the old wider budget.
-        workspaceWidth=Math.min(workspaceWidth,dp(getResources().getConfiguration().screenWidthDp));
+    void fitWidth(int workspaceWidth){workspaceBudget=workspaceWidth;sizeIcons();}
+    private void sizeIcons(){
+        int configured=dp(getResources().getConfiguration().screenWidthDp);
+        // Use one budget in measure and layout, including narrower inset/IME transitions.
+        int workspaceWidth=workspaceBudget>0?Math.min(workspaceBudget,configured):configured;
         // Leave room for Start, the clock, and part of the scrolling task strip.
         int width = Math.min(dp(44), Math.max(dp(24), (workspaceWidth - dp(200)) / getChildCount()));
         for (int i = 0; i < getChildCount(); i++) {

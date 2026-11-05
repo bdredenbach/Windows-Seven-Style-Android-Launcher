@@ -2,6 +2,8 @@
 
 Nth Desktop Seven is a Windows 7–inspired Android home launcher. Its first test build, **0.1.0**, adds Aero Snap and installs alongside Nth Desktop Vista under the separate app ID `com.nthexperience.desktop.seven`.
 
+**0.6.1** keeps the tray within its actual available width during inset and keyboard transitions, using the same sizing budget in measurement and layout. It contains all of the 0.6.0 finishing touches below and updates the same Seven installation.
+
 **0.6.0** completes the Seven interaction pass:
 
 - Briefly press a taskbar icon, then drag sideways to reorder. Quick horizontal swipes still scroll, upward flicks open Jump Lists, and stationary holds show previews. Order survives restarts; Ctrl+Shift+Left/Right and accessibility actions also move icons.
@@ -212,7 +214,7 @@ These are native built-in desktop gadgets. This release does not yet host third-
 
 ## Install and update
 
-The supplied Seven 0.6.0 test APK uses the original `com.nthexperience.desktop.seven` identity and the recovered Seven-specific test key, matching the original builds through 0.5.2. Open **Nth Desktop Seven**, then choose it under **Android Settings → Apps → Default apps → Home app** when ready.
+The supplied Seven 0.6.1 test APK uses the original `com.nthexperience.desktop.seven` identity and the recovered Seven-specific test key, matching the original builds through 0.5.2. Open **Nth Desktop Seven**, then choose it under **Android Settings → Apps → Default apps → Home app** when ready.
 
 The later 0.5.3–0.5.11 Preview builds used `com.nthexperience.desktop.seven.preview` and a different key that is no longer available in this workspace. Version 0.5.12 cannot update that Preview install in place. Before switching, export its desktop backup through Control Panel → Backup and Restore, install 0.5.12, and restore the backup there. Keep Preview installed until the restored setup is verified. Android permissions and file access must be granted again; Recycle Bin contents and browser data are not included in desktop backups.
 

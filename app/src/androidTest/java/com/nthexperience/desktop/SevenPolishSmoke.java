@@ -161,6 +161,13 @@ public final class SevenPolishSmoke extends Instrumentation {
         shot("seven-portrait-tray");
         check(peek.getWidth()>=dp(32)&&strip.getWidth()>0,"Expanded tray leaves a usable Peek target and a scrolling task area");
         View tray=find(root,v->v instanceof SystemTray);for(int i=0;i<((ViewGroup)tray).getChildCount();i++){View icon=((ViewGroup)tray).getChildAt(i);if(icon.isShown())check(bounds(icon).width()>=dp(24),"Tray controls keep their touch width");}
+        ui(()->{
+            SystemTray fitted=(SystemTray)tray;
+            fitted.fitWidth(dp(350));int expected=fitted.getChildAt(1).getLayoutParams().width;
+            fitted.measure(View.MeasureSpec.makeMeasureSpec(dp(350),View.MeasureSpec.AT_MOST),View.MeasureSpec.makeMeasureSpec(dp(48),View.MeasureSpec.EXACTLY));
+            check(fitted.getChildAt(1).getLayoutParams().width==expected,"Measurement preserves an explicitly narrower workspace budget");
+            fitted.fitWidth(((View)fitted.getParent()).getWidth());
+        });
     }
     private View showDesktop(){return find(root,v->v instanceof FrameLayout&&( "Show desktop".equals(v.getContentDescription())||"Restore desktop windows".equals(v.getContentDescription())));}
     private View slot(String id){return find(root,v->id.equals(TaskbarReorder.key(v)));}
