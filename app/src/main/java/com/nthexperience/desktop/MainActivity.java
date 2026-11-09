@@ -85,6 +85,7 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
     private StartMenu startMenu;
     private LinearLayout taskbarView;private FrameLayout taskClip;
     private final List<String> visibleTaskOrder=new ArrayList<>();
+    private List<String> renderedTaskPins=Collections.emptyList(),renderedTaskOrder=Collections.emptyList();
     private TaskbarReorder taskbarReorder;private final Map<String,Integer> taskColors=new HashMap<>();
     private SystemTray tray;private WindowPreviews previews;private BrightnessControl brightness;
     private TextView clock;
@@ -370,7 +371,11 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
         for(LinearLayout button:buttons.values())taskItems.addView(button);
         Map<String,View> ordered=new LinkedHashMap<>();
         for(int i=firstTask;i<taskItems.getChildCount();i++){View button=taskItems.getChildAt(i);ordered.put(TaskbarReorder.key(button),button);}
-        List<String> order=TaskbarOrder.apply(new ArrayList<>(ordered.keySet()),store.taskbarOrder());
+        List<String> configuredPins=store.quickLaunch(),savedOrder=store.taskbarOrder();
+        if(!configuredPins.equals(renderedTaskPins)||!savedOrder.equals(renderedTaskOrder)){
+            visibleTaskOrder.clear();renderedTaskPins=new ArrayList<>(configuredPins);renderedTaskOrder=new ArrayList<>(savedOrder);
+        }
+        List<String> order=TaskbarOrder.apply(new ArrayList<>(ordered.keySet()),savedOrder);
         // Newly opened tools append; inserting a Control Panel button must not flip existing row assignments.
         order=TaskbarOrder.apply(order,visibleTaskOrder);visibleTaskOrder.clear();visibleTaskOrder.addAll(order);
         for(int i=taskItems.getChildCount()-1;i>=firstTask;i--)taskItems.removeViewAt(i);

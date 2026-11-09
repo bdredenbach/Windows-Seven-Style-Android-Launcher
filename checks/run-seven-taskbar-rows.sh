@@ -13,9 +13,10 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 adb shell input keyevent KEYCODE_WAKEUP
 adb shell wm dismiss-keyguard
-for runner in SevenTaskbarRowsSmoke SevenPolishSmoke SnapSmoke; do
+for runner in SevenTaskbarRowsSmoke SevenPolishSmoke SnapSmoke FidelitySmoke; do
  adb shell am force-stop "$launcher"
  adb shell pm clear "$launcher"
+ if [[ "$runner" == FidelitySmoke ]]; then adb shell appops set --uid "$launcher" MANAGE_EXTERNAL_STORAGE allow; fi
  log=seven-rows-${runner}.txt
  timeout -k 3s 300s adb shell am instrument -w "$launcher.test/com.nthexperience.desktop.$runner" | tee "$log"
  grep -q 'PASS:' "$log"
