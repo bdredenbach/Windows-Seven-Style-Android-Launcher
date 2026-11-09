@@ -31,7 +31,7 @@ public final class SevenTaskbarRowsSmoke extends Instrumentation {
         check(!store.prefs.getBoolean("taskbar_expanded",false),"Fresh Seven uses one row");
         for(int orientation:new int[]{ActivityInfo.SCREEN_ORIENTATION_PORTRAIT,ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE}){
             boolean portrait=orientation==ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
-            ui(()->{home.setRequestedOrientation(orientation);store.prefs.edit().putInt("desktop_rows_portrait",8).putInt("desktop_rows_landscape",3).commit();refresh();find(root,v->v instanceof DesktopIconGrid).requestLayout();});
+            ui(()->{home.setRequestedOrientation(orientation);store.prefs.edit().putBoolean("taskbar_expanded",false).putInt("desktop_rows_portrait",8).putInt("desktop_rows_landscape",3).commit();refresh();find(root,v->v instanceof DesktopIconGrid).requestLayout();});
             await(()->portrait?root.getHeight()>root.getWidth():root.getWidth()>root.getHeight(),"Orientation");settle();
             ui(()->home.open("setting:page:taskbar"));settle();DesktopWindow control=window("@control");check(control!=null,"Taskbar Control Panel opens");FrameLayout workspace=(FrameLayout)control.getParent();
             Map<String,Rect> icons=icons();List<String> order=keys();int height=workspace.getHeight();
