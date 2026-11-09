@@ -1,0 +1,64 @@
+{
+  "format": "nth-desktop-backup",
+  "version": 1,
+  "variant": "vista",
+  "wallpapers": [
+    "Aero",
+    "Twilight",
+    "Meadow"
+  ],
+  "settings": {
+    "shortcuts": {
+      "type": "string",
+      "value": "[\"@notes\", \"@computer\", \"folder:12345678-1234-1234-1234-123456789abc\"]"
+    },
+    "quick_launch": {
+      "type": "string",
+      "value": "[\"@notes\", \"@computer\"]"
+    },
+    "app_folders": {
+      "type": "string",
+      "value": "{\"folder:12345678-1234-1234-1234-123456789abc\": {\"name\": \"My folder\", \"items\": [\"@notes\", \"@computer\"]}}"
+    },
+    "shortcut_names": {
+      "type": "string",
+      "value": "{\"@computer\": \"My shortcut\"}"
+    },
+    "gadgets": {
+      "type": "string",
+      "value": "[]"
+    },
+    "file_manager_apps": {
+      "type": "string",
+      "value": "[]"
+    },
+    "gadget_photos": {
+      "type": "string",
+      "value": "[]"
+    },
+    "linked_folders": {
+      "type": "string",
+      "value": "[]"
+    },
+    "note": {
+      "type": "string",
+      "value": "A portable note from vista"
+    },
+    "gadget_note": {
+      "type": "string",
+      "value": "Portable sticky note"
+    },
+    "gadget_layout_portrait": {
+      "type": "string",
+      "value": "{}"
+    },
+    "gadget_layout_landscape": {
+      "type": "string",
+      "value": "{}"
+    },
+    "wallpaper": {
+      "type": "int",
+      "value": 2
+    }
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "format": "nth-desktop-backup",
+  "version": 1,
+  "variant": "seven",
+  "wallpapers": [
+    "Aero",
+    "Twilight",
+    "Meadow",
+    "Seven Blue",
+    "Harmony",
+    "Alpine Morning",
+    "Pacific Dusk",
+    "Canyon Light",
+    "Glass Pavilion",
+    "Midnight Circuit",
+    "Paper Skies"
+  ],
+  "settings": {
+    "shortcuts": {
+      "type": "string",
+      "value": "[\"@notes\", \"@recycle\", \"folder:12345678-1234-1234-1234-123456789abc\"]"
+    },
+    "quick_launch": {
+      "type": "string",
+      "value": "[\"@notes\", \"@recycle\"]"
+    },
+    "app_folders": {
+      "type": "string",
+      "value": "{\"folder:12345678-1234-1234-1234-123456789abc\": {\"name\": \"My folder\", \"items\": [\"@notes\", \"@recycle\"]}}"
+    },
+    "shortcut_names": {
+      "type": "string",
+      "value": "{\"@recycle\": \"My shortcut\"}"
+    },
+    "gadgets": {
+      "type": "string",
+      "value": "[]"
+    },
+    "file_manager_apps": {
+      "type": "string",
+      "value": "[]"
+    },
+    "gadget_photos": {
+      "type": "string",
+      "value": "[]"
+    },
+    "linked_folders": {
+      "type": "string",
+      "value": "[]"
+    },
+    "note": {
+      "type": "string",
+      "value": "A portable note from seven"
+    },
+    "gadget_note": {
+      "type": "string",
+      "value": "Portable sticky note"
+    },
+    "gadget_layout_portrait": {
+      "type": "string",
+      "value": "{}"
+    },
+    "gadget_layout_landscape": {
+      "type": "string",
+      "value": "{}"
+    },
+    "wallpaper": {
+      "type": "int",
+      "value": 10
+    }
+  }
+}

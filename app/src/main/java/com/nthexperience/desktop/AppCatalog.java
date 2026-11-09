@@ -15,8 +15,9 @@ import java.util.Set;
 final class AppCatalog {
     static final class Entry {
         final String id, label;
-        final Drawable icon;
-        Entry(String id, String label, Drawable icon) { this.id = id; this.label = label; this.icon = icon; }
+        final Drawable icon; final long installed; final int category;
+        Entry(String id, String label, Drawable icon) { this(id,label,icon,0,-1); }
+        Entry(String id,String label,Drawable icon,long installed,int category) { this.id=id;this.label=label;this.icon=icon;this.installed=installed;this.category=category; }
     }
     static List<Entry> load(Context context) {
         PackageManager manager = context.getPackageManager();
