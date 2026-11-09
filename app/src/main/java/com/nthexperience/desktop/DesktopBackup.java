@@ -15,6 +15,7 @@ import java.util.*;
 final class DesktopBackup {
     static final int MAX_BYTES=8*1024*1024;
     static final String FORMAT="nth-desktop-backup";
+    static final String VARIANT="seven";
     static final String PENDING="desktop-restore-preview.json", UNDO="desktop-before-restore.json", EXPORT="desktop-export.json";
     private static final Set<String> BOOLEANS=new HashSet<>(Arrays.asList("desktop_recycle_added",DesktopBackgrounds.SHUFFLE,"seven_taskbar_grouping_set","explorer_menu_bar","control_panel_small_icons","taskmanager_animate","tray_expanded","tray_battery","tray_network","tray_volume","tray_brightness","desktop_sounds","sound_complete","sound_error","sound_notice","recent_items_enabled","taskbar_previews","taskbar_static","taskbar_show_labels","explorer_thumbnails","explorer_navigation","desktop_labels","explorer_hidden","sidebar_always_top","taskbar_apps","weather_follow","aero_transparency","startup_sound","reduce_motion","welcome_on_start","clock_seconds","layout_locked","show_status_bar","snap_gadgets","snap_desktop","weather_f","control_panel_classic","explorer_details","sidebar_visible","desktop_v41"));
     private static final Set<String> INTS=new HashSet<>(Arrays.asList("wallpaper_bg",DesktopBackgrounds.INTERVAL,"recycle_capacity_mb","desktop_icon_percent","desktop_label_size","desktop_spacing_x","desktop_spacing_y","desktop_columns_portrait","desktop_columns_landscape","desktop_rows_portrait","desktop_rows_landscape","desktop_sound_volume","wallpaper","clock_style","desktop_icon_size","aero_color","aero_intensity","aero_opacity","startup_mode"));
@@ -24,7 +25,9 @@ final class DesktopBackup {
         final Map<String,Object> values;
         final String text,created;
         final int skipped;
-        Plan(Map<String,Object> values,String text,String created,int skipped){this.values=Collections.unmodifiableMap(values);this.text=text;this.created=created;this.skipped=skipped;}
+        final List<String> skippedItems;
+        final boolean partial;
+        Plan(Map<String,Object> values,String text,String created,Set<String> skipped,boolean partial){this.values=Collections.unmodifiableMap(values);this.text=text;this.created=created;this.skipped=skipped.size();this.skippedItems=Collections.unmodifiableList(new ArrayList<>(skipped));this.partial=partial;}
         String string(String key,String fallback){Object value=values.get(key);return value instanceof String?(String)value:fallback;}
         int count(String key){try{return new JSONArray(string(key,"[]")).length();}catch(JSONException ex){return 0;}}
         int folders(){try{return new JSONObject(string("app_folders","{}")).length();}catch(JSONException ex){return 0;}}
@@ -40,31 +43,42 @@ final class DesktopBackup {
             String key=entry.getKey(),kind=kind(key);if(kind==null)continue;Object value=entry.getValue();if(value==null)continue;
             JSONObject field=new JSONObject().put("type",kind).put("value",value);settings.put(key,field);
         }
-        return new JSONObject().put("format",FORMAT).put("version",1).put("appVersion",AppInfo.version(store.context)).put("createdAt",new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX",Locale.US).format(new Date())).put("settings",settings);
+        return new JSONObject().put("format",FORMAT).put("version",1).put("variant",VARIANT).put("wallpapers",new JSONArray(Arrays.asList(BackupCompatibility.WALLPAPERS))).put("appVersion",AppInfo.version(store.context)).put("createdAt",new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX",Locale.US).format(new Date())).put("settings",settings);
     }
     static Plan parse(String text)throws JSONException {
         if(text.getBytes(StandardCharsets.UTF_8).length>MAX_BYTES)throw new JSONException("Backup is larger than 8 MB");
         checkDepth(text);JSONTokener reader=new JSONTokener(text);Object root=reader.nextValue();if(!(root instanceof JSONObject)||reader.nextClean()!=0)throw new JSONException("Choose a complete Nth Desktop backup");JSONObject object=(JSONObject)root;
-        if(!FORMAT.equals(object.opt("format"))||!integer(object.opt("version"))||((Number)object.get("version")).intValue()!=1)throw new JSONException("This backup format or version is not supported");
-        JSONObject settings=object.getJSONObject("settings");if(settings.length()>512)throw new JSONException("Too many settings in this backup");Map<String,Object> values=new LinkedHashMap<>();int skipped=0;
+        if((!FORMAT.equals(object.opt("format"))&&!"nth-desktop-eight-backup".equals(object.opt("format")))||!integer(object.opt("version"))||((Number)object.get("version")).intValue()!=1)throw new JSONException("This backup format or version is not supported");
+        JSONObject settings=object.getJSONObject("settings");if(settings.length()>512)throw new JSONException("Too many settings in this backup");Map<String,Object> values=new LinkedHashMap<>();Set<String> skipped=new LinkedHashSet<>();boolean compatible=!VARIANT.equals(object.optString("variant"));
         Iterator<String> keys=settings.keys();while(keys.hasNext()){
-            String key=keys.next(),expected=kind(key);if(expected==null){skipped++;continue;}JSONObject field=settings.getJSONObject(key);if(!expected.equals(field.opt("type")))throw new JSONException("Wrong setting type: "+key);Object value=field.get("value");
+            String key=keys.next(),expected=kind(key);if(expected==null){skipped.add(key);continue;}JSONObject field=settings.getJSONObject(key);if(!expected.equals(field.opt("type")))throw new JSONException("Wrong setting type: "+key);Object value=field.get("value");
             if(expected.equals("boolean")){if(!(value instanceof Boolean))throw new JSONException("Invalid switch: "+key);}
-            else if(expected.equals("int")){if(!integer(value))throw new JSONException("Invalid number: "+key);int n=((Number)value).intValue();if(n<minimum(key)||n>maximum(key))throw new JSONException("Setting out of range: "+key);value=n;}
+            else if(expected.equals("int")){if(!integer(value))throw new JSONException("Invalid number: "+key);int n=((Number)value).intValue();if(!(compatible&&key.equals("wallpaper"))&&(n<minimum(key)||n>maximum(key)))throw new JSONException("Setting out of range: "+key);value=n;}
             else{if(!(value instanceof String))throw new JSONException("Invalid text: "+key);int limit=key.equals("note")||key.equals("gadget_note")?2*1024*1024:512*1024;if(((String)value).length()>limit)throw new JSONException("Setting too large: "+key);}
             values.put(key,value);
         }
         for(String key:Arrays.asList("shortcuts","quick_launch","app_folders","shortcut_names","gadgets","file_manager_apps","gadget_photos","linked_folders","note","gadget_note","gadget_layout_portrait","gadget_layout_landscape"))if(!values.containsKey(key))throw new JSONException("Incomplete backup: "+key);
-        validate(values);
+        if(compatible){
+            BackupCompatibility.normalize(values,object,skipped);
+            Map<String,Object> accepted=new LinkedHashMap<>();
+            for(String key:Arrays.asList("shortcuts", "quick_launch", "app_folders", "shortcut_names", "gadgets", "file_manager_apps", "gadget_photos", "linked_folders", "note", "gadget_note", "gadget_layout_portrait", "gadget_layout_landscape"))accepted.put(key,values.get(key));
+            validate(accepted);
+            List<String> optional=new ArrayList<>(values.keySet());optional.removeAll(accepted.keySet());Collections.sort(optional);
+            // Desktop membership and private drafts depend on the desktop metadata.
+            for(String key:Arrays.asList("eight_web_tiles","ten_desktop_items","ten_desktops"))if(optional.remove(key))optional.add(0,key);
+            if(optional.remove("ten_desktops"))optional.add(0,"ten_desktops");
+            for(String key:optional){accepted.put(key,values.get(key));try{validate(accepted);}catch(JSONException incompatible){accepted.remove(key);skipped.add(key+" (not supported by this desktop)");}}
+            values=accepted;
+        }else validate(values);
         String created=object.optString("createdAt","Unknown date");if(created.length()>64)created="Unknown date";
-        return new Plan(values,text,created,skipped);
+        return new Plan(values,text,created,skipped,compatible||!skipped.isEmpty());
     }
     private static int minimum(String key){if(key.equals("recycle_capacity_mb"))return 100;return key.equals("desktop_icon_percent")?60:key.equals("desktop_label_size")?10:0;}
     private static int maximum(String key){if(key.equals("wallpaper"))return DesktopBackgrounds.NAMES.length-1;if(key.equals(DesktopBackgrounds.INTERVAL))return 86400;if(key.equals("wallpaper_bg"))return 5;if(key.equals("recycle_capacity_mb"))return 2048;if(key.equals("desktop_sound_volume"))return 100;if(key.equals("desktop_icon_percent"))return 150;if(key.equals("desktop_label_size"))return 16;if(key.startsWith("desktop_spacing_"))return 24;if(key.startsWith("desktop_columns_"))return 10;if(key.startsWith("desktop_rows_"))return 16;return key.equals("aero_color")?7:(key.equals("aero_intensity")||key.equals("aero_opacity"))?100:key.equals("clock_style")?1:2;}
     private static String kind(String key){if(BOOLEANS.contains(key))return "boolean";if(INTS.contains(key))return "int";if(STRINGS.contains(key)||((key.startsWith("window_portrait_")||key.startsWith("window_landscape_"))&&key.length()<550))return "string";return null;}
     private static boolean integer(Object value){return value instanceof Number&&Double.isFinite(((Number)value).doubleValue())&&((Number)value).doubleValue()==((Number)value).intValue();}
     private static boolean folderId(String id){if(!id.startsWith("folder:"))return false;try{UUID.fromString(id.substring(7));return true;}catch(IllegalArgumentException ex){return false;}}
-    private static boolean shortcut(String id,JSONObject folders,boolean allowFolder){if(FolderLinks.id(id))return true;return id!=null&&id.length()<=512&&(BUILTINS.contains(id)||(id.startsWith("@gadget:")&&GadgetCatalog.extra(id.substring(8)))||(allowFolder&&folderId(id)&&folders.has(id))||(!id.startsWith("@")&&!id.startsWith("folder:")&&ComponentName.unflattenFromString(id)!=null));}
+    static boolean shortcut(String id,JSONObject folders,boolean allowFolder){if(FolderLinks.id(id))return true;return id!=null&&id.length()<=512&&(BUILTINS.contains(id)||(id.startsWith("@gadget:")&&GadgetCatalog.extra(id.substring(8)))||(allowFolder&&folderId(id)&&folders.has(id))||(!id.startsWith("@")&&!id.startsWith("folder:")&&ComponentName.unflattenFromString(id)!=null));}
     private static List<String> ids(Object raw,int limit)throws JSONException{if(!(raw instanceof JSONArray))throw new JSONException("Expected a shortcut list");JSONArray list=(JSONArray)raw;if(list.length()>limit)throw new JSONException("Shortcut list is too large");List<String> result=new ArrayList<>();for(int i=0;i<list.length();i++){Object value=list.get(i);if(!(value instanceof String)||result.contains(value))throw new JSONException("Invalid or duplicate list item");result.add((String)value);}return result;}
     private static void validate(Map<String,Object> values)throws JSONException {
         if(values.containsKey("shortcut_folder_view")&&!Arrays.asList("Large icons","Medium icons","Small icons","List","Details").contains(values.get("shortcut_folder_view")))throw new JSONException("Invalid shortcut folder view");
@@ -114,7 +128,15 @@ final class DesktopBackup {
     static void discard(Context context,String name){new AtomicFile(file(context,name)).delete();}
     static void apply(Context context,DesktopStore store,Plan plan,boolean undo)throws IOException,JSONException{
         Map<String,?> old=new LinkedHashMap<>(store.prefs.getAll());if(!undo)stage(context,UNDO,snapshot(store).toString());
-        SharedPreferences.Editor edit=store.prefs.edit().clear();for(Map.Entry<String,Object> e:plan.values.entrySet())put(edit,e.getKey(),e.getValue());edit.putBoolean("desktop_v41",true);
+        SharedPreferences.Editor edit=store.prefs.edit();if(!plan.partial)edit.clear();
+        if(plan.partial&&plan.values.containsKey("ten_desktops"))for(String dependent:Arrays.asList("ten_desktop_items","eleven_nota_drafts","ten_nota_windows"))if(!plan.values.containsKey(dependent))edit.remove(dependent);
+        if(plan.partial&&plan.values.containsKey("shortcuts")&&!plan.values.containsKey("ten_desktop_items")&&!plan.values.containsKey("ten_desktops")&&store.prefs.contains("ten_desktop_items")){
+            JSONObject metadata=new JSONObject(store.prefs.getString("ten_desktops","{}")),banks=new JSONObject(store.prefs.getString("ten_desktop_items","{}"));
+            String first=metadata.getJSONArray("desktops").getJSONObject(0).getString("id");JSONObject bank=banks.getJSONObject(first);JSONArray restored=new JSONArray(plan.string("shortcuts","[]"));bank.put("shortcuts",restored);
+            for(String axis:Arrays.asList("portrait","landscape")){String positions="desktop_positions_"+axis;JSONObject points=plan.values.containsKey(positions)?new JSONObject(plan.string(positions,"{}")):bank.optJSONObject(axis);if(points==null)points=new JSONObject();Set<String> icons=new HashSet<>();for(int i=0;i<restored.length();i++)icons.add(restored.getString(i));Iterator<String> ids=points.keys();while(ids.hasNext())if(!icons.contains(ids.next()))ids.remove();bank.put(axis,points);}
+            edit.putString("ten_desktop_items",banks.toString());
+        }
+        for(Map.Entry<String,Object> e:plan.values.entrySet())put(edit,e.getKey(),e.getValue());edit.putBoolean("desktop_v41",true);
         if(!edit.commit()){SharedPreferences.Editor rollback=store.prefs.edit().clear();for(Map.Entry<String,?> e:old.entrySet())put(rollback,e.getKey(),e.getValue());rollback.commit();throw new IOException("The desktop could not be saved. Your previous setup was kept.");}
         discard(context,PENDING);if(undo)discard(context,UNDO);
     }
