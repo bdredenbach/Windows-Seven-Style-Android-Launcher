@@ -13,7 +13,20 @@ final class AeroIcon extends View {
         orb = kind.equals("orb") ? c.getDrawable(R.drawable.ic_launcher) : null;
         if (orb != null) orb.setBounds(0, 0, 64, 64);
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO); }
-    @Override protected void onDraw(Canvas canvas) {
+    private Bitmap cachedIcon;private String cachedIconKey;
+    private final Paint cachedPaint=new Paint(Paint.FILTER_BITMAP_FLAG);
+    @Override protected void onDraw(Canvas canvas){
+        int width=getWidth(),height=getHeight();if(width<1||height<1)return;
+        if(width>512||height>512){drawArtwork(canvas);return;}
+        String key=kind+":"+width+":"+height+":"+getPaddingLeft()+":"+getPaddingTop()+":"+getPaddingRight()+":"+getPaddingBottom()+":"+getResources().getConfiguration().densityDpi+":"+getResources().getConfiguration().uiMode;
+        if(cachedIcon==null||!key.equals(cachedIconKey)){
+            cachedIcon=BuiltinIconCache.get(key);
+            if(cachedIcon==null){cachedIcon=Bitmap.createBitmap(width,height,Bitmap.Config.ARGB_8888);drawArtwork(new Canvas(cachedIcon));BuiltinIconCache.put(key,cachedIcon);}
+            cachedIconKey=key;
+        }
+        canvas.drawBitmap(cachedIcon,0,0,cachedPaint);
+    }
+    private void drawArtwork(Canvas canvas) {
         float s = Math.min(getWidth()-getPaddingLeft()-getPaddingRight(),getHeight()-getPaddingTop()-getPaddingBottom())/64f;
         canvas.save(); canvas.translate((getWidth()-64*s)/2,(getHeight()-64*s)/2); canvas.scale(s,s);
         p.setShader(null); p.setStyle(Paint.Style.FILL); p.setAlpha(255);

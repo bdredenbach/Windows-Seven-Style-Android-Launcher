@@ -137,5 +137,33 @@
     "icon": "2c1714edb85828f888c3086302a92bac9ad2b4c1768eda63d1477a28f5095936",
     "defaultLabel": "2e756382524249bf6884bb1e8f7e72060451266b3bb869de206dd218f23f18c6",
     "taskManager": "be3e445198a7a8069b566c94c742cbe89449cc99e48a86840a441f195968009f"
+  },
+  "approved_runtime_changes": {
+    "app/src/main/java/com/nthexperience/desktop/AeroIcon.java": {
+      "sha256": "7d35ad9156f3d2d6e2d77149c7f6c64696511c9714851ae28b1baf72eddec80a",
+      "reason": "Cache static artwork without changing its drawing implementation."
+    },
+    "app/src/main/java/com/nthexperience/desktop/DesktopIconGrid.java": {
+      "sha256": "2591bd1935f7277f72711980afd789624a5d619a59b3516990751671e0dd0bc7",
+      "reason": "Fit labels above extended taskbars and reuse unchanged placement plans."
+    },
+    "app/src/main/java/com/nthexperience/desktop/DesktopMetrics.java": {
+      "sha256": "c03c088b0f7e4ffa6c05088bfa3a067ecfa239a2d9150a2d9d973e40fa3ee68e",
+      "reason": "Fit complete icon rows to the usable taskbar viewport."
+    },
+    "app/src/main/java/com/nthexperience/desktop/DesktopStore.java": {
+      "sha256": "3d4d3da060693bbad547355a3527fe644a0f33fd5e5e9fa55e330145a7682ae9",
+      "reason": "Reuse parsed shortcut and folder names; invalidate on saved data changes."
+    },
+    "app/src/main/java/com/nthexperience/desktop/GadgetLayout.java": {
+      "sha256": "6c26e2340151670f3746100425484a12dfb6d0f37f02a0130628a63ce238f4a0",
+      "reason": "Share gadget visibility and membership across orientations while preserving positions."
+    }
+  },
+  "approved_shell_changes": {
+    "layoutWorkspace": {
+      "sha256": "efe6774f9e0875f8adb2222f9a7004f6ce59496b1696f43136ff2ae1b6ab716d",
+      "reason": "Use the actual taskbar viewport to fit complete icon rows; preserve saved coordinates."
+    }
   }
 }

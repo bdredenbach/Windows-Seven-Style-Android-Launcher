@@ -72,5 +72,8 @@ final class DesktopCache {
             stream = file.startWrite(); stream.write(bytes); file.finishWrite(stream);
         } catch (IOException | JSONException | RuntimeException ignored) { if (stream != null) file.failWrite(stream); }
     }
+    static boolean matches(Map<String,AppCatalog.Entry> current,List<AppCatalog.Entry> next){
+        if(next==null||current.size()!=next.size())return false;for(AppCatalog.Entry app:next)if(current.get(app.id)!=app)return false;return true;
+    }
     private DesktopCache() {}
 }

@@ -167,7 +167,7 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
             if(current!=null&&Build.VERSION.SDK_INT>=28&&current.getDisplayCutout()!=null)holes.addAll(current.getDisplayCutout().getBoundingRects());
             desktop.configure(dp(store.tileWidth()),dp(store.tileHeight()),holes);
             int iconHeight=Math.max(1,height-desktopScroll.getPaddingTop()-desktopScroll.getPaddingBottom());
-            // Row spacing belongs to the normal desktop; only its viewport shrinks for a second taskbar row.
+            // Fit complete rows to the visible work area without rewriting saved positions.
             int gridHeight=Math.max(1,shell.getHeight()-shell.getPaddingTop()-shell.getPaddingBottom()-dp(54)-desktopScroll.getPaddingTop()-desktopScroll.getPaddingBottom());
             desktop.viewport(iconHeight,gridHeight);
             FrameLayout.LayoutParams gadgetParams=(FrameLayout.LayoutParams)sidebar.getLayoutParams();
@@ -243,7 +243,7 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
             if(cached!=null)main.post(()->{if(destroyed||restoringBackup||generation!=scanGeneration||!entries.isEmpty())return;for(AppCatalog.Entry e:cached)entries.put(e.id,e);startMenu.entries(cached);renderDesktop();renderTaskbar();});
             apps=DesktopCache.load(getApplicationContext());
             List<AppCatalog.Entry> result=apps;if(result!=null)ExternalTasks.refresh(getApplicationContext(),store,result);
-            main.post(()->{if(destroyed||restoringBackup||generation!=scanGeneration)return;scanPending=false;if(result==null){if(scanAgain){scanAgain=false;scanApps();}return;}taskColors.clear();entries.clear();for(AppCatalog.Entry e:result)entries.put(e.id,e);startMenu.entries(result);renderDesktop();renderTaskbar();for(DesktopWindow tool:windows.values())if(tool.getParent()!=null&&tool.body instanceof VistaShell)((VistaShell)tool.body).refreshApps();if(scanAgain){scanAgain=false;scanApps();}});
+            main.post(()->{if(destroyed||restoringBackup||generation!=scanGeneration)return;scanPending=false;if(result==null){if(scanAgain){scanAgain=false;scanApps();}return;}if(DesktopCache.matches(entries,result)){renderTaskbar();}else{taskColors.clear();entries.clear();for(AppCatalog.Entry e:result)entries.put(e.id,e);startMenu.entries(result);renderDesktop();renderTaskbar();for(DesktopWindow tool:windows.values())if(tool.getParent()!=null&&tool.body instanceof VistaShell)((VistaShell)tool.body).refreshApps();}if(scanAgain){scanAgain=false;scanApps();}});
         });
     }
     int desktopGridWidth(){return desktop==null?0:desktop.getWidth();}
