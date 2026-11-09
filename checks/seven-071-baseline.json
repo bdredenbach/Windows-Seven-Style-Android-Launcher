@@ -160,8 +160,8 @@
       "reason": "Share gadget visibility and membership across orientations while preserving positions."
     },
     "app/src/main/AndroidManifest.xml": {
-      "sha256": "9cb6980d02ab1689f779df268e7aa34d2f5a604b1ad2617fa55932e48e8942b0",
-      "reason": "Register opt-in phone notification access for the requested initialization step."
+      "sha256": "797c649aed040fb8a7ab078615e6e0d680ea9722fc058e5df6d860cd23942a25",
+      "reason": "Declare foreground precise/coarse location and native uninstall requests, retaining notification access."
     },
     "app/src/main/java/com/nthexperience/desktop/ActionCenter.java": {
       "sha256": "87f2f9acd9fbfc92aa436153c2cb2cd7b9b0868e2c0c49c712d8c671f02a2626",
@@ -174,6 +174,18 @@
     "app/src/main/java/com/nthexperience/desktop/SystemTray.java": {
       "sha256": "a0ef059ca716e7627417962686f3f5a7edf8735283cfc0c3a8b606f33d98e709",
       "reason": "Show phone notifications in the existing classic tray controls without changing taskbar geometry."
+    },
+    "app/src/main/java/com/nthexperience/desktop/ShortcutMenus.java": {
+      "sha256": "13f87fcd07d8659a01268f30e0b34d0b9693253a7dffe711f7c61540281907f8",
+      "reason": "Add a distinct native Android uninstall action for eligible installed apps."
+    },
+    "app/src/main/java/com/nthexperience/desktop/StartMenu.java": {
+      "sha256": "7bf10188f3fb43d3423ab6fa5268168b4d087883b54ec8787047af5513e68e7e",
+      "reason": "Preserve Start styling while exposing direct uninstall/context-click app actions."
+    },
+    "app/src/main/java/com/nthexperience/desktop/WeatherLocation.java": {
+      "sha256": "892ec0c206e9e1a6d730519b103da06809972b28e7c32fce9a22367491c7c4a5",
+      "reason": "Accept approximate grants and use precise/GPS access only when granted."
     }
   },
   "approved_shell_changes": {

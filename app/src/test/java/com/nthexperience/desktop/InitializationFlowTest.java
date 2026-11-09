@@ -42,13 +42,13 @@ public class InitializationFlowTest {
     private void later(){dialog().getButton(AlertDialog.BUTTON_NEGATIVE).performClick();shadowOf(Looper.getMainLooper()).idle();}
     private void enable(){dialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick();shadowOf(Looper.getMainLooper()).idle();}
     private void finishEmptyFolderCheck(){flow.pending();shadowOf(Looper.getMainLooper()).idle();flow.pending();assertFalse(flow.pending());}
-    @Test public void allSixStepsUseRequestedOrderAndDeclinesContinue(){
-        String[] titles={"Default Launcher","Enable File Browsing","Enable Usage Access","Allow Notifications Access","Modify System Settings (Brightness)"};
+    @Test public void allSevenStepsUseRequestedOrderAndDeclinesContinue(){
+        String[] titles={"Default Launcher","Enable File Browsing","Enable Usage Access","Allow Notifications Access","Modify System Settings (Brightness)","Allow Location"};
         for(int i=0;i<titles.length;i++){assertTrue(flow.pending());assertEquals(Step.values()[i],flow.state.step());assertTitle(titles[i]);later();}
         assertEquals(Step.FOLDERS,flow.state.step());finishEmptyFolderCheck();assertEquals(Step.DONE,flow.state.step());assertFalse(flow.pending());
     }
     @Test public void existingGrantsAreSkippedAndCompletionIsDeviceLocal()throws Exception{
-        granted.addAll(Arrays.asList(Step.HOME,Step.FILES,Step.USAGE,Step.NOTIFICATIONS,Step.BRIGHTNESS));finishEmptyFolderCheck();assertEquals(Step.DONE,new InitializationState(activity).step());assertFalse(DesktopBackup.snapshot(store).toString().contains(InitializationState.PREFS));assertFalse(store.prefs.contains("step"));
+        granted.addAll(Arrays.asList(Step.HOME,Step.FILES,Step.USAGE,Step.NOTIFICATIONS,Step.BRIGHTNESS,Step.LOCATION));finishEmptyFolderCheck();assertEquals(Step.DONE,new InitializationState(activity).step());assertFalse(DesktopBackup.snapshot(store).toString().contains(InitializationState.PREFS));assertFalse(store.prefs.contains("step"));
     }
     @Test public void settingsReturnWaitsForFocusAndThenOffersNotifications(){
         granted.addAll(Arrays.asList(Step.HOME,Step.FILES));assertTrue(flow.pending());assertEquals(Step.USAGE,flow.state.step());enable();assertEquals(InitializationFlow.USAGE,flow.state.waiting());Intent launched=shadowOf(activity).getNextStartedActivityForResult().intent;assertEquals(Settings.ACTION_USAGE_ACCESS_SETTINGS,launched.getAction());
@@ -64,7 +64,7 @@ public class InitializationFlowTest {
         granted.addAll(Arrays.asList(Step.HOME,Step.FILES));flow.pending();enable();flow.paused();flow.close();flow=new TestFlow();flow.resumed();flow.pending();assertEquals(Step.NOTIFICATIONS,flow.state.step());assertTitle("Allow Notifications Access");
     }
     @Test public void restoredBackupQueuesOnlyFolderRepairAndClearsDeferrals(){
-        for(int i=0;i<6;i++)flow.state.advance();flow.state.defer("old");InitializationState.restored(activity);assertEquals(Step.FOLDERS,flow.state.step());assertTrue(flow.state.deferred().isEmpty());flow.state.prefs.edit().putInt("step",Step.USAGE.ordinal()).commit();InitializationState.restored(activity);assertEquals(Step.USAGE,flow.state.step());
+        for(int i=0;i<Step.DONE.ordinal();i++)flow.state.advance();flow.state.defer("old");InitializationState.restored(activity);assertEquals(Step.FOLDERS,flow.state.step());assertTrue(flow.state.deferred().isEmpty());flow.state.prefs.edit().putInt("step",Step.USAGE.ordinal()).commit();InitializationState.restored(activity);assertEquals(Step.USAGE,flow.state.step());
     }
     @Test public void interruptedFolderWorkCanBeRetriedAfterRecreation(){flow.state.prefs.edit().putInt("step",Step.FOLDERS.ordinal()).commit();flow.state.waitFor(InitializationFlow.REPAIR,"content://example.documents/tree/old");flow.state.prefs.edit().putBoolean("processing",true).commit();flow.close();flow=new TestFlow();flow.resumed();assertEquals(0,flow.state.waiting());finishEmptyFolderCheck();}
     @Test public void freshLaunchClearsOrphanedPickerRequest(){flow.state.prefs.edit().putInt("step",Step.FOLDERS.ordinal()).commit();flow.state.waitFor(InitializationFlow.REPAIR,"content://example.documents/tree/old");flow.close();InitializationFlow fresh=new InitializationFlow(activity,store,host,Runnable::run,false);assertEquals(0,fresh.state.waiting());assertEquals(Step.FOLDERS,fresh.state.step());fresh.close();}
@@ -87,6 +87,16 @@ public class InitializationFlowTest {
     @Test public void unavailableSettingsAdvanceWithoutLooping(){
         flow.close();ActivityController<UnavailableSettings> unavailableController=Robolectric.buildActivity(UnavailableSettings.class).setup();Activity unavailableActivity=unavailableController.get();granted.addAll(Arrays.asList(Step.HOME,Step.FILES));InitializationFlow unavailable=new InitializationFlow(unavailableActivity,store,host,Runnable::run){@Override boolean granted(Step step){return granted.contains(step);}};
         try{unavailable.resumed();unavailable.pending();dialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick();shadowOf(Looper.getMainLooper()).idle();assertEquals(Step.NOTIFICATIONS,unavailable.state.step());assertEquals(0,unavailable.state.waiting());}finally{unavailable.close();unavailableController.pause().stop().destroy();}
+    }
+
+    @Test public void locationRequestsBothPermissionsForAndroidAccuracyChoice(){
+        flow.state.prefs.edit().putInt("step",Step.LOCATION.ordinal()).commit();store.prefs.edit().putString("weather_city","Saved city").commit();flow.pending();assertTitle("Allow Location");enable();org.robolectric.shadows.ShadowActivity.PermissionsRequest request=shadowOf(activity).getLastRequestedPermission();assertEquals(InitializationFlow.LOCATION,request.requestCode);assertArrayEquals(new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION,android.Manifest.permission.ACCESS_COARSE_LOCATION},request.requestedPermissions);flow.permissionResult(InitializationFlow.LOCATION);flow.paused();flow.resumed();flow.pending();assertEquals(Step.FOLDERS,flow.state.step());assertEquals("Saved city",store.prefs.getString("weather_city",""));
+    }
+    @Test public void oldCompletedSetupOffersLocationOnce(){
+        flow.state.prefs.edit().putInt("flow_version",1).putInt("step",6).commit();InitializationState migrated=new InitializationState(activity);assertEquals(Step.LOCATION,migrated.step());migrated.advance();assertEquals(Step.FOLDERS,new InitializationState(activity).step());
+    }
+    @Test public void migrationKeepsAnInFlightFolderSelection(){
+        flow.state.prefs.edit().putInt("flow_version",1).putInt("step",5).putInt("waiting",InitializationFlow.REPAIR).putString("repair_uri","content://example.documents/tree/old").commit();InitializationState migrated=new InitializationState(activity);assertEquals(Step.LOCATION,migrated.step());assertEquals(InitializationFlow.REPAIR,migrated.waiting());assertEquals("content://example.documents/tree/old",migrated.prefs.getString("repair_uri",null));
     }
 
 }

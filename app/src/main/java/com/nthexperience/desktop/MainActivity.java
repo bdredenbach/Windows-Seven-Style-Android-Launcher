@@ -94,7 +94,7 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
     private boolean destroyed,scanPending,scanAgain,receiverRegistered;
     private int scanGeneration,columns;
     private OnBackInvokedCallback backCallback;
-    private final BroadcastReceiver packages=new BroadcastReceiver(){@Override public void onReceive(Context c,Intent i){DesktopCache.invalidate();scanApps();}};
+    private final BroadcastReceiver packages=new BroadcastReceiver(){@Override public void onReceive(Context c,Intent i){String removed=AppUninstaller.removedPackage(i);if(removed!=null){AppUninstaller.removed(store,removed);worker.execute(()->DesktopCache.forgetPackage(getApplicationContext(),removed));}DesktopCache.invalidate();scanApps();}};
     private final BroadcastReceiver timeChanged=new BroadcastReceiver(){@Override public void onReceive(Context c,Intent i){updateClock();if(Intent.ACTION_LOCALE_CHANGED.equals(i.getAction())){DesktopCache.invalidate();scanApps();}}};
     private final Runnable taskbarRender=()->{if(!destroyed)renderTaskbar();};
     private final Runnable desktopRender=()->{if(!destroyed)renderDesktop();};
@@ -1547,6 +1547,7 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
     }
     @Override protected void onActivityResult(int request,int result,Intent data){
         super.onActivityResult(request,result,data);
+        if(request==AppUninstaller.REQUEST){String removed=AppUninstaller.returned(this,store);if(removed!=null)worker.execute(()->DesktopCache.forgetPackage(getApplicationContext(),removed));DesktopCache.invalidate();scanApps();return;}
         if(initialization!=null&&initialization.result(request,result,data)){if(request==REQUEST_HOME)homeRequestInFlight=false;return;}
         if(request==REQUEST_HOME){
             homeRequestInFlight=false;
@@ -1734,6 +1735,6 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
         WeatherPanel panel=new WeatherPanel(this,store,sidebar.weather,weatherLocation,new WeatherPanel.Host(){public void locate(){locateWeather();}public void settings(){launchSystem(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));}public void follow(boolean enabled){store.prefs.edit().putBoolean("weather_follow",enabled).apply();if(enabled)locateWeather();else weatherLocation.stopFollowing();updateWeatherSummary();}public void refresh(){sidebar.weather.refresh(true);sidebar.refresh();updateWeatherSummary();}});window("@weather","Weather settings",panel);
     }
     private void updateWeatherSummary(){DesktopWindow current=windows.get("@weather");if(current!=null&&current.body instanceof WeatherPanel)((WeatherPanel)current.body).refresh();}
-    private void locateWeather(){if(weatherLocation==null)return;if(!weatherLocation.permitted()){requestPermissions(new String[]{android.Manifest.permission.ACCESS_COARSE_LOCATION},42);return;}weatherLocation.locate();}
-    @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){super.onRequestPermissionsResult(request,permissions,grants);if(initialization!=null)initialization.permissionResult(request);DesktopWindow browser=windows.get("@browser");if(browser!=null&&browser.getParent()!=null&&browser.body instanceof BrowserPanel&&((BrowserPanel)browser.body).permissionResult(request))return;if(request==StorageAccess.REQUEST){boolean access=StorageAccess.has(this);storageAllowed=access;filesChanged();if(!access)toast("File access was not enabled. You can still connect individual folders.");return;}if(request==42){if(grants.length>0&&grants[0]==android.content.pm.PackageManager.PERMISSION_GRANTED)weatherLocation.locate();else weatherLocation.denied();}}
+    private void locateWeather(){if(weatherLocation==null)return;if(!weatherLocation.permitted()){LocationAccess.request(this,42,true);return;}weatherLocation.locate();}
+    @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){super.onRequestPermissionsResult(request,permissions,grants);if(initialization!=null)initialization.permissionResult(request);DesktopWindow browser=windows.get("@browser");if(browser!=null&&browser.getParent()!=null&&browser.body instanceof BrowserPanel&&((BrowserPanel)browser.body).permissionResult(request))return;if(request==StorageAccess.REQUEST){boolean access=StorageAccess.has(this);storageAllowed=access;filesChanged();if(!access)toast("File access was not enabled. You can still connect individual folders.");return;}if(request==42){if(LocationAccess.permitted(this))weatherLocation.locate();else weatherLocation.denied();}}
 }

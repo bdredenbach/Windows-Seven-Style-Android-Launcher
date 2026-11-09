@@ -13,7 +13,7 @@ The 0.7.1 backup schema is kept, including expanded taskbar, icon/grid, folder a
 
 ## Validation
 
-`python checks/CheckSevenBaseline.py` verifies the unchanged identity, 117 existing runtime files and seven existing shell/layout methods, plus explicitly pinned requested rendering/gadget changes and unchanged original icon artwork against the 0.7.1 baseline. In addition, the unit suite checks five source-family fixtures, unsupported items, background names, corruption rejection, restore/undo, existing expanded-taskbar preferences and saved themes, cached icons, cold scan failure and Task Manager navigation.
+`python checks/CheckSevenBaseline.py` verifies the unchanged identity, 114 existing runtime files and seven existing shell/layout methods, plus explicitly pinned requested rendering/gadget changes and unchanged original icon artwork against the 0.7.1 baseline. In addition, the unit suite checks five source-family fixtures, unsupported items, background names, corruption rejection, restore/undo, existing expanded-taskbar preferences and saved themes, cached icons, cold scan failure and Task Manager navigation.
 
 Build and test with Java 17 / Android SDK 36:
 
@@ -42,7 +42,8 @@ After the existing startup introduction, all five desktops use the same device-l
 3. Enable Usage Access.
 4. Allow Notifications Access (Android Notification access for showing the phone's notifications).
 5. Modify System Settings (Brightness).
-6. Fix unlinked folders from a restored backup.
+6. Allow Location with approximate/precise access.
+7. Fix unlinked folders from a restored backup.
 
 Granted steps are skipped. Each permission remains optional; Later/cancellation advances, and unavailable Settings activities do not block setup. Pending Android requests and progress survive recreation. An interrupted folder transaction can be retried, and a fresh launch clears an orphaned picker request. The existing Welcome/start surface follows this flow. The introduction artwork and boot-playback policy are retained. Setup progress and Android grants are excluded from desktop backups.
 
@@ -53,3 +54,15 @@ Links to a known Nth storage provider can translate to this desktop's own provid
 Eight, Ten and Eleven use their existing notification-listener components. Vista and Seven gain the same in-memory listener support, protected by Android's notification-listener binding permission, and phone notifications on their classic tray surfaces. In Vista, Notification Center is available from Device controls (hold the tray chevron); Seven also shows phone notifications in its existing Action Center. Notification content remains in memory and respects the existing locked-phone filtering.
 
 `InitializationFlowTest` exercises the ordered dialogs, granted-step skipping, Settings intents, denial/cancellation, focus/recreation, interrupted/orphaned requests, unavailable Settings, notification-service declarations and last-step folder repair. `FolderRepairTest` exercises root/favorite/shortcut updates, preserved identities/layouts, concurrent-edit protection, partial repairs, de-duplication, real provider grants/path lookup, and missing/ambiguous descendants. The instrumentation APK is compiled; Android device/emulator instrumentation is not run in this workspace.
+
+## Location choice and uninstall from Start
+
+Initialization now follows Default Launcher, File Browsing, Usage Access, Notifications Access, System Settings for Brightness, Location, then restored-folder repair. Location stays optional. Android 12 and later receive fine and coarse requests together so Android offers its native approximate/precise choice. Older Android versions receive separate approximate/precise choices in the setup dialog. Coarse-only grants are accepted, saved weather choices are kept, and background-location permission is not requested. Precise permission enables the GPS provider when available; all location work remains foreground-only.
+
+Device-local initialization schema v2 inserts Location without replaying completed earlier steps. Existing completed or folder-repair-stage v1 sessions offer Location once and retain in-flight folder picker state; folder repair remains last. Desktop backups still do not transfer permissions or initialization progress.
+
+Installed removable Android apps now have an explicit **Uninstall** command in their Start context menus. Vista/Seven support touch hold and mouse context clicks on program rows; Ten exposes it directly for apps and pinned tiles; Eleven exposes it directly in Start app options; Eight exposes it in its selected-app command bar and 8.1 Update tile popup, including app-row context clicks. Built-in launcher tools, folders, missing apps, this launcher and protected system apps do not offer the command. Unpinning/removing a shortcut remain separate actions.
+
+Uninstall opens Android's package-uninstall confirmation using ACTION_DELETE, with REQUEST_DELETE_PACKAGES declared. It does not open App info/settings. Android retains its confirmation and policy checks. Canceled or blocked requests keep launcher data. Confirmed removal updates Start pins (including both Eight tile banks) and the cached app inventory; package replacements do not count as uninstalls. The worker forgets an explicitly removed app from disk/memory so removing the last cached app cannot revive it through the empty-scan fallback.
+
+`LocationAccessTest`, the updated `InitializationFlowTest`, `AppUninstallerTest` and per-variant `StartUninstallMenuTest` cover coarse/fine declarations and requests, migration, real Start menu commands, normal app opening, native uninstall intents, cancellation, policy failures, protected/built-in filtering, both Eight banks and cold-cache removal. Real-device Android permission/uninstall dialogs still require phone/emulator verification.

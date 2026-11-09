@@ -75,5 +75,7 @@ final class DesktopCache {
     static boolean matches(Map<String,AppCatalog.Entry> current,List<AppCatalog.Entry> next){
         if(next==null||current.size()!=next.size())return false;for(AppCatalog.Entry app:next)if(current.get(app.id)!=app)return false;return true;
     }
+    // Called on the catalog worker after confirmed removal, including removal of the last app.
+    static synchronized void forgetPackage(Context context,String pkg){List<AppCatalog.Entry> previous=read(context);if(previous==null)return;List<AppCatalog.Entry> kept=new ArrayList<>(previous);if(kept.removeIf(app->pkg.equals(AppUninstaller.packageName(app.id)))){memory=kept;configuration=configuration(context);refreshed=0;write(context,kept,configuration);}}
     private DesktopCache() {}
 }

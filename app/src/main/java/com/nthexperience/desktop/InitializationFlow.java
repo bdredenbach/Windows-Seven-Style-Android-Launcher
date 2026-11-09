@@ -12,7 +12,7 @@ import static com.nthexperience.desktop.InitializationState.Step;
 
 /** One optional, ordered setup flow. Each Android grant remains the user's choice. */
 class InitializationFlow {
-    static final int HOME=12,USAGE=620,NOTIFICATIONS=621,BRIGHTNESS=622,REPAIR=623,FOLDER=624;
+    static final int HOME=12,USAGE=620,NOTIFICATIONS=621,BRIGHTNESS=622,REPAIR=623,FOLDER=624,LOCATION=625;
     interface Host {boolean ready();boolean home();boolean requestHome();void changed();void wake();}
     private final Activity activity;private final DesktopStore store;private final Host host;private final Executor worker;
     final InitializationState state;
@@ -44,7 +44,7 @@ class InitializationFlow {
         }
         return false;
     }
-    boolean granted(Step step){switch(step){case HOME:return host.home();case FILES:return StorageAccess.has(activity);case USAGE:return ExternalTasks.permitted(activity);case NOTIFICATIONS:return TenNotifications.allowed(activity);case BRIGHTNESS:return Settings.System.canWrite(activity);default:return false;}}
+    boolean granted(Step step){switch(step){case HOME:return host.home();case FILES:return StorageAccess.has(activity);case USAGE:return ExternalTasks.permitted(activity);case NOTIFICATIONS:return TenNotifications.allowed(activity);case BRIGHTNESS:return Settings.System.canWrite(activity);case LOCATION:return LocationAccess.permitted(activity);default:return false;}}
     private void prompt(Step step){
         String title,message,button;
         switch(step){
@@ -53,9 +53,11 @@ class InitializationFlow {
             case USAGE:title="Enable Usage Access";message="Allow Nth Desktop to show apps you open elsewhere on its taskbar. On Android's next screen, select this desktop and enable Usage Access.";button="Enable Usage Access";break;
             case NOTIFICATIONS:title="Allow Notifications Access";message="Allow the taskbar notification center to show your phone's notifications. On Android's next screen, select this desktop and allow Notification access.";button="Allow notification access";break;
             case BRIGHTNESS:title="Modify System Settings (Brightness)";message="Allow Nth Desktop's brightness control to adjust the phone's brightness. On Android's next screen, allow modifying system settings.";button="Allow brightness control";break;
+            case LOCATION:title="Allow Location";message="Use your location for local weather while Nth Desktop is visible. Approximate location is enough for weather. "+(Build.VERSION.SDK_INT>=31?"Android will let you choose approximate or precise access.":"Choose approximate or precise access below.");button=Build.VERSION.SDK_INT>=31?"Choose location access":"Use precise location";break;
             default:return;
         }
         AlertDialog.Builder builder=Aero.dialog(activity).setTitle(title).setMessage(message+"\n\nYou can skip this step and change access later in Android settings.").setPositiveButton(button,(d,w)->request(step)).setNegativeButton("Later",(d,w)->{state.advance();postWake();});
+        if(step==Step.LOCATION&&Build.VERSION.SDK_INT<31)builder.setNeutralButton("Use approximate location",(d,w)->requestApproximateLocation());
         if(step==Step.FILES)builder.setNeutralButton("Choose folders",(d,w)->pick(FOLDER,null));
         show(builder,()->{state.advance();postWake();});
     }
@@ -63,7 +65,7 @@ class InitializationFlow {
         AlertDialog shown=builder.create();dialog=shown;shown.setOnCancelListener(d->cancel.run());shown.setOnDismissListener(d->{if(dialog==shown)dialog=null;postWake();});shown.show();Aero.styleDialog(activity,shown);
     }
     private void request(Step step){
-        int code=step==Step.HOME?HOME:step==Step.FILES?StorageAccess.REQUEST:step==Step.USAGE?USAGE:step==Step.NOTIFICATIONS?NOTIFICATIONS:BRIGHTNESS;
+        int code=step==Step.HOME?HOME:step==Step.FILES?StorageAccess.REQUEST:step==Step.USAGE?USAGE:step==Step.NOTIFICATIONS?NOTIFICATIONS:step==Step.LOCATION?LOCATION:BRIGHTNESS;
         launchedAt=SystemClock.uptimeMillis();state.waitFor(code,null);
         try{
             switch(step){
@@ -76,11 +78,13 @@ class InitializationFlow {
                     try{activity.startActivityForResult(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS,Uri.parse("package:"+activity.getPackageName())),USAGE);}catch(ActivityNotFoundException|SecurityException unavailable){activity.startActivityForResult(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS),USAGE);}break;
                 case NOTIFICATIONS:activity.startActivityForResult(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS),NOTIFICATIONS);break;
                 case BRIGHTNESS:activity.startActivityForResult(new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS,Uri.parse("package:"+activity.getPackageName())),BRIGHTNESS);break;
+                case LOCATION:LocationAccess.request(activity,LOCATION,true);break;
                 default:break;
             }
         }catch(ActivityNotFoundException|SecurityException unavailable){state.clearWaiting();notice("This settings screen is unavailable on this device. You can continue setup.");completedStep();}
         postWake();
     }
+    private void requestApproximateLocation(){launchedAt=SystemClock.uptimeMillis();state.waitFor(LOCATION,null);try{LocationAccess.request(activity,LOCATION,false);}catch(SecurityException unavailable){state.clearWaiting();completedStep();}postWake();}
     private void completedStep(){
         Step step=state.step();state.clearWaiting();
         if(step==Step.FILES)activity.getSharedPreferences(StorageAccess.PREFS,0).edit().putBoolean("seen",true).apply();
