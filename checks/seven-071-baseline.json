@@ -198,7 +198,7 @@
       "reason": "Use the actual taskbar viewport to fit complete icon rows; preserve saved coordinates."
     },
     "renderTaskbar": {
-      "sha256": "a15641064db4bd9a7ac38d416b2b29a390d4a4db6167bbcb71e15b9b9250221f",
+      "sha256": "7de96744fbf7b6a14d8d1385fd622aa857be18ae062bf856af065a65a04b4141",
       "reason": "Defer taskbar refresh during the initial pointer gesture; retain the established Seven render body and bottom-row controls."
     }
   }
