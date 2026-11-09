@@ -21,7 +21,7 @@ final class TaskbarReorder {
     private final GradientDrawable marker=new GradientDrawable();
     private Move active;
     private boolean closed,markerAdded;
-    private float rawX;
+    private float rawX,rawY;
     private final Runnable autoscroll=new Runnable(){public void run(){
         if(active==null||closed)return;
         int[] at=new int[2];scroll.getLocationOnScreen(at);
@@ -50,7 +50,7 @@ final class TaskbarReorder {
     boolean begin(View button){
         String id=key(button);
         if(closed||active!=null||id==null||keys().size()<2)return false;
-        Move move=new Move(this,button,id);active=move;int[] start=new int[2];button.getLocationOnScreen(start);rawX=start[0]+button.getWidth()/2f;
+        Move move=new Move(this,button,id);active=move;int[] start=new int[2];button.getLocationOnScreen(start);rawX=start[0]+button.getWidth()/2f;rawY=start[1]+button.getHeight()/2f;
         boolean started=button.startDragAndDrop(ClipData.newPlainText("taskbar-order",id),new View.DragShadowBuilder(button),move,0);
         if(!started){active=null;return false;}
         button.setAlpha(.4f);main.post(autoscroll);return true;
@@ -70,15 +70,20 @@ final class TaskbarReorder {
             case DragEvent.ACTION_DRAG_STARTED:return !closed;
             case DragEvent.ACTION_DRAG_LOCATION:
             case DragEvent.ACTION_DRAG_ENTERED:
-                int[] at=new int[2];items.getLocationOnScreen(at);rawX=at[0]+event.getX();updateMarker();return true;
+                int[] at=new int[2];items.getLocationOnScreen(at);rawX=at[0]+event.getX();rawY=at[1]+event.getY();updateMarker();return true;
             case DragEvent.ACTION_DRAG_EXITED:removeMarker();return true;
             case DragEvent.ACTION_DROP:
-                move.order=TaskbarOrder.move(keys(),move.id,indexAt(event.getX(),move.id));return true;
+                move.order=TaskbarOrder.move(keys(),move.id,indexAt(event.getX(),event.getY(),move.id));return true;
             case DragEvent.ACTION_DRAG_ENDED:finish(move,event.getResult());return true;
             default:return true;
         }
     }
-    private int indexAt(float x,String moving){
+    private int indexAt(float x,float y,String moving){
+        if(items instanceof TaskbarItems&&((TaskbarItems)items).expanded){
+            int best=0,index=0;double distance=Double.MAX_VALUE;
+            for(int i=0;i<items.getChildCount();i++){View child=items.getChildAt(i);String id=key(child);if(id==null||id.equals(moving))continue;double dx=x-child.getLeft()-child.getWidth()/2f,dy=y-child.getTop()-child.getHeight()/2f;double next=dx*dx+dy*dy;if(next<distance){distance=next;best=index+(x>child.getLeft()+child.getWidth()/2f?1:0);}index++;}
+            return best;
+        }
         int index=0;
         for(int i=0;i<items.getChildCount();i++){
             View child=items.getChildAt(i);String id=key(child);
@@ -89,15 +94,16 @@ final class TaskbarReorder {
     private void updateMarker(){
         if(active==null)return;
         int[] at=new int[2];items.getLocationOnScreen(at);
-        int index=indexAt(rawX-at[0],active.id),seen=0,x=0;
+        int index=indexAt(rawX-at[0],rawY-at[1],active.id),seen=0,x=0,y=0;
         for(int i=0;i<items.getChildCount();i++){
             View child=items.getChildAt(i);String id=key(child);
             if(id==null||id.equals(active.id))continue;
-            if(seen++==index){x=child.getLeft();break;}
-            x=child.getRight();
+            if(seen++==index){x=child.getLeft();y=child.getTop();break;}
+            x=child.getRight();y=child.getTop();
         }
         int width=Aero.dp(items.getContext(),2),pad=Aero.dp(items.getContext(),3);
-        marker.setBounds(Math.max(0,x-width),pad,Math.max(width,x+width),Math.max(pad+1,items.getHeight()-pad));
+        int rowHeight=items instanceof TaskbarItems&&((TaskbarItems)items).expanded?Aero.dp(items.getContext(),48):items.getHeight();
+        marker.setBounds(Math.max(0,x-width),y+pad,Math.max(width,x+width),Math.max(y+pad+1,y+rowHeight-pad));
         if(!markerAdded){items.getOverlay().add(marker);markerAdded=true;}
         marker.invalidateSelf();
     }

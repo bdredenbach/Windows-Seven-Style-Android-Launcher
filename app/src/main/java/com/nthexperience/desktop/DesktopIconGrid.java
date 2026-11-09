@@ -10,7 +10,7 @@ import org.json.*;
 final class DesktopIconGrid extends ViewGroup {
     private final DesktopStore store;
     private String key;
-    private int tileWidth,tileHeight,preferredWidth,preferredHeight,viewportHeight,plannedX,plannedY;
+    private int tileWidth,tileHeight,preferredWidth,preferredHeight,viewportHeight,layoutHeight,plannedX,plannedY;
     private final List<Rect> cutouts=new ArrayList<>(),positions=new ArrayList<>();
     DesktopIconGrid(Context context,DesktopStore store,String orientation){super(context);this.store=store;key="desktop_positions_"+orientation;setLayerType(LAYER_TYPE_SOFTWARE,null);}
     void orientation(String orientation){key="desktop_positions_"+orientation;requestLayout();}
@@ -20,7 +20,8 @@ final class DesktopIconGrid extends ViewGroup {
     int cellWidth(){return Math.max(1,tileWidth);}
     int cellHeight(){return Math.max(1,tileHeight);}
     int viewportHeight(){return viewportHeight;}
-    void viewport(int height){if(viewportHeight!=height){viewportHeight=height;requestLayout();}}
+    void viewport(int height){viewport(height,height);}
+    void viewport(int height,int gridHeight){if(viewportHeight!=height||layoutHeight!=gridHeight){viewportHeight=height;layoutHeight=gridHeight;requestLayout();}}
     private boolean blocked(Rect rect){Rect content=new Rect(rect);content.inset(Aero.dp(getContext(),7),Aero.dp(getContext(),3));content.offset(plannedX,plannedY);for(Rect hole:cutouts)if(Rect.intersects(content,hole))return true;return false;}
     private boolean occupied(Rect rect,List<Rect> used){for(Rect other:used)if(other!=null&&Rect.intersects(rect,other))return true;return false;}
     private Rect at(float x,float y,int width,int height,boolean snap){int w=Math.max(1,tileWidth),h=Math.max(1,tileHeight);if(snap){x=DesktopGeometry.clamp(DesktopGeometry.snap(x,w),0,Math.max(0,(width-w)/w)*w);y=DesktopGeometry.clamp(DesktopGeometry.snap(y,h),0,Math.max(0,(height-h)/h)*h);}int left=Math.round(DesktopGeometry.clamp(x,0,Math.max(0,width-w))),top=Math.round(DesktopGeometry.clamp(y,0,Math.max(0,height-h)));return new Rect(left,top,left+w,top+h);}
@@ -37,13 +38,13 @@ final class DesktopIconGrid extends ViewGroup {
     @Override protected void onMeasure(int widthSpec,int heightSpec){
         int width=MeasureSpec.getSize(widthSpec);String orientation=key.endsWith("landscape")?"landscape":"portrait";
         tileWidth=DesktopMetrics.cell(width,store.gridColumns(orientation),preferredWidth,Aero.dp(getContext(),48+store.spacingX()));
-        tileHeight=DesktopMetrics.cell(Math.max(1,viewportHeight),store.gridRows(orientation),preferredHeight,Aero.dp(getContext(),store.iconLabels()?Math.max(72,store.labelSize()*2.6f+29+store.spacingY()):48+store.spacingY()));
+        tileHeight=DesktopMetrics.cell(Math.max(1,layoutHeight),store.gridRows(orientation),preferredHeight,Aero.dp(getContext(),store.iconLabels()?Math.max(72,store.labelSize()*2.6f+29+store.spacingY()):48+store.spacingY()));
         int w=tileWidth,h=tileHeight,count=getChildCount();
         int[] origin=new int[2];getLocationOnScreen(origin);plannedX=origin[0];plannedY=origin[1];positions.clear();for(int i=0;i<count;i++)positions.add(null);
         JSONObject all=saved();boolean snap=store.prefs.getBoolean("snap_desktop",true);int bottom=Math.max(viewportHeight,h);float density=getResources().getDisplayMetrics().density;
         int extent=bottom;for(int i=0;i<count;i++){JSONObject point=all.optJSONObject(String.valueOf(getChildAt(i).getTag()));if(point!=null)extent=Math.max(extent,Math.round(DesktopGeometry.clamp((float)point.optDouble("y",0),0,60000)*density)+h);}
         for(int i=0;i<count;i++){JSONObject point=all.optJSONObject(String.valueOf(getChildAt(i).getTag()));if(point==null)continue;Rect cell=at((float)point.optDouble("x",0)*Math.max(0,width-w),(float)point.optDouble("y",0)*density,width,extent,snap);if(!blocked(cell)&&(!snap||!occupied(cell,positions))){positions.set(i,cell);bottom=Math.max(bottom,cell.bottom);}}
-        int columns=Math.max(1,width/w),rows=Math.max(1,Math.max(viewportHeight/h,(count+columns-1)/columns));
+        int columns=Math.max(1,width/w),rows=Math.max(1,Math.max(layoutHeight/h,(count+columns-1)/columns));
         for(int i=0;i<count;i++)if(positions.get(i)==null){boolean found=false;for(int extra=0;!found;extra++){for(int column=0;column<columns&&!found;column++)for(int row=0;row<rows+extra&&!found;row++){Rect cell=new Rect(column*w,row*h,(column+1)*w,(row+1)*h);if(!blocked(cell)&&!occupied(cell,positions)){positions.set(i,cell);bottom=Math.max(bottom,cell.bottom);found=true;}}}}
         for(int i=0;i<count;i++){View child=getChildAt(i);if(child instanceof android.widget.LinearLayout){android.widget.LinearLayout tile=(android.widget.LinearLayout)child;if(tile.getChildCount()>0){int labelHeight=0;if(tile.getChildCount()>1&&tile.getChildAt(1).getVisibility()!=GONE){android.widget.TextView label=(android.widget.TextView)tile.getChildAt(1);labelHeight=label.getLineHeight()*2;}int size=DesktopMetrics.icon(Aero.dp(getContext(),store.iconSize()),w,h,tile.getPaddingLeft()+tile.getPaddingRight()+Aero.dp(getContext(),4),tile.getPaddingTop()+tile.getPaddingBottom(),labelHeight);View icon=tile.getChildAt(0);ViewGroup.LayoutParams lp=icon.getLayoutParams();if(lp.width!=size||lp.height!=size){lp.width=size;lp.height=size;icon.setLayoutParams(lp);}}}child.measure(MeasureSpec.makeMeasureSpec(w,MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(h,MeasureSpec.EXACTLY));}setMeasuredDimension(width,resolveSize(bottom,heightSpec));
     }
