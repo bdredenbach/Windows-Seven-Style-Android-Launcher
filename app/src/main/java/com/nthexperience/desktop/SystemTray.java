@@ -108,6 +108,7 @@ final class SystemTray extends LinearLayout {
         summary=Aero.text(getContext(),"",13,Aero.INK);summary.setPadding(0,0,0,dp(12));summary.setContentDescription("Tray status details");body.addView(summary);
         switch(value){
             case "actioncenter":
+                body.addView(new PhoneNotifications(getContext()));
                 frame.setContentDescription("Action Center flyout");
                 java.util.List<ActionCenter.Alert> alerts=ActionCenter.alerts(getContext(),new DesktopStore(getContext()));
                 for(ActionCenter.Alert alert:alerts){

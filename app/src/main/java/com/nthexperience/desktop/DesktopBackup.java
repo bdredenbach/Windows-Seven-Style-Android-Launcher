@@ -146,6 +146,7 @@ final class DesktopBackup {
         }
         for(Map.Entry<String,Object> e:plan.values.entrySet())put(edit,e.getKey(),e.getValue());edit.putBoolean("desktop_v41",true);
         if(!edit.commit()){SharedPreferences.Editor rollback=store.prefs.edit().clear();for(Map.Entry<String,?> e:old.entrySet())put(rollback,e.getKey(),e.getValue());rollback.commit();throw new IOException("The desktop could not be saved. Your previous setup was kept.");}
+        InitializationState.restored(context);
         discard(context,PENDING);if(undo)discard(context,UNDO);
     }
     private static void put(SharedPreferences.Editor edit,String key,Object value){if(value instanceof Boolean)edit.putBoolean(key,(Boolean)value);else if(value instanceof Integer)edit.putInt(key,(Integer)value);else if(value instanceof Long)edit.putLong(key,(Long)value);else if(value instanceof Float)edit.putFloat(key,(Float)value);else if(value instanceof String)edit.putString(key,(String)value);}

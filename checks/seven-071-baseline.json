@@ -158,6 +158,22 @@
     "app/src/main/java/com/nthexperience/desktop/GadgetLayout.java": {
       "sha256": "6c26e2340151670f3746100425484a12dfb6d0f37f02a0130628a63ce238f4a0",
       "reason": "Share gadget visibility and membership across orientations while preserving positions."
+    },
+    "app/src/main/AndroidManifest.xml": {
+      "sha256": "9cb6980d02ab1689f779df268e7aa34d2f5a604b1ad2617fa55932e48e8942b0",
+      "reason": "Register opt-in phone notification access for the requested initialization step."
+    },
+    "app/src/main/java/com/nthexperience/desktop/ActionCenter.java": {
+      "sha256": "87f2f9acd9fbfc92aa436153c2cb2cd7b9b0868e2c0c49c712d8c671f02a2626",
+      "reason": "Include the newly authorized phone notification access in the existing Seven Action Center."
+    },
+    "app/src/main/java/com/nthexperience/desktop/StartupExperience.java": {
+      "sha256": "9478d4ec283a84954b336fdf6b0fe2ac3494684b3eca2726d3e0ed35da0b3286",
+      "reason": "Run the six requested initialization steps before the existing Welcome/start surface."
+    },
+    "app/src/main/java/com/nthexperience/desktop/SystemTray.java": {
+      "sha256": "a0ef059ca716e7627417962686f3f5a7edf8735283cfc0c3a8b606f33d98e709",
+      "reason": "Show phone notifications in the existing classic tray controls without changing taskbar geometry."
     }
   },
   "approved_shell_changes": {

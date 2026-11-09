@@ -36,6 +36,7 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
     private boolean backupBusy,restoringBackup;
     private FrameLayout restoreCover;
     private StartupExperience startup;
+    private InitializationFlow initialization;
     private static final int REQUEST_HOME = 12;
     static final int REQUEST_USAGE_ACCESS=311;
     static final int REQUEST_USAGE_APP_INFO=312;
@@ -129,7 +130,12 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
         if(Build.VERSION.SDK_INT>=33)registerReceiver(packages,packageFilter,Context.RECEIVER_EXPORTED);else registerReceiver(packages,packageFilter);
         IntentFilter timeFilter=new IntentFilter();timeFilter.addAction(Intent.ACTION_TIME_CHANGED);timeFilter.addAction(Intent.ACTION_TIMEZONE_CHANGED);timeFilter.addAction(Intent.ACTION_LOCALE_CHANGED);
         if(Build.VERSION.SDK_INT>=33)registerReceiver(timeChanged,timeFilter,Context.RECEIVER_EXPORTED);else registerReceiver(timeChanged,timeFilter);
-        receiverRegistered=true;scanApps();loadRestorePreview();startup=new StartupExperience(this,root,store,saved!=null,()->open("@welcome"));
+        receiverRegistered=true;scanApps();loadRestorePreview();startup=new StartupExperience(this,root,store,saved!=null,()->open("@welcome"));initialization=new InitializationFlow(this,store,new InitializationFlow.Host(){
+            public boolean ready(){return !destroyed&&!restoringBackup&&!isFinishing()&&hasWindowFocus()&&root.getWidth()>0&&(storageSetup==null||!storageSetup.showing())&&usageGuide==null;}
+            public boolean home(){return isHome();}public boolean requestHome(){return MainActivity.this.requestHome();}
+            public void changed(){refreshUsageAccess();filesChanged();if(brightness!=null)brightness.apply();}
+            public void wake(){if(startup!=null)root.post(startup::maybeShow);}
+        },worker,saved!=null);
     }
     private void buildDesktop(){
         root=new FrameLayout(this);wallpaper=new AeroWallpaper(this,store.prefs.getInt("wallpaper",AeroWallpaper.SEVEN));root.addView(wallpaper,new FrameLayout.LayoutParams(-1,-1));
@@ -982,7 +988,7 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
         }catch(Exception error){if(request==20)DesktopBackup.discard(this,DesktopBackup.EXPORT);main.post(()->{if(destroyed)return;backupBusy=false;backupStatus((request==20?"Backup could not be saved: ":"Backup was not opened: ")+error.getMessage());backupPanel(false);});}});
     }
     private void restoreBackup(boolean undo){
-        if(backupBusy||(!undo&&restorePlan==null))return;backupBusy=true;restoringBackup=true;scanGeneration++;if(weatherLocation!=null)weatherLocation.pause();if(sidebar!=null)sidebar.close();
+        if(backupBusy||(!undo&&restorePlan==null))return;backupBusy=true;restoringBackup=true;if(initialization!=null)initialization.close();scanGeneration++;if(weatherLocation!=null)weatherLocation.pause();if(sidebar!=null)sidebar.close();
         restoreCover=new FrameLayout(this);restoreCover.setBackgroundColor(0xee0a263b);restoreCover.setClickable(true);restoreCover.setElevation(dp(100));TextView waiting=Aero.text(this,"Restoring your desktop…",18,Color.WHITE);waiting.setGravity(Gravity.CENTER);restoreCover.addView(waiting,new FrameLayout.LayoutParams(-1,-1));root.addView(restoreCover,new FrameLayout.LayoutParams(-1,-1));DesktopBackup.Plan selected=restorePlan;
         worker.execute(()->{String result;try{DesktopBackup.Plan plan=undo?DesktopBackup.staged(this,DesktopBackup.UNDO):selected;DesktopBackup.apply(this,store,plan,undo);result=undo?"Your previous desktop was recovered.":"Desktop restored. Undo last restore is available in Backup and Restore.";}catch(Exception error){result="Restore did not finish: "+error.getMessage();}String message=result;main.post(()->{if(destroyed)return;getIntent().putExtra("backup_status",message);recreate();});});
     }
@@ -1186,7 +1192,7 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
             case "taskbar-usage-app-info":openUsageAppInfo();return;
             case "restart-desktop":startMenu.hide();main.post(this::recreate);return;
             case "show-desktop":for(DesktopWindow w:windows.values())if(w.getParent()!=null&&w.getVisibility()==View.VISIBLE)w.minimize();startMenu.hide();return;
-            case "storage-access":storageSetup.show(true);return;case "glass":wallpaper.appearanceChanged();return;case "startup-preview":if(startup!=null)startup.preview();return;
+            case "repair-folders":if(initialization!=null)initialization.retryFolders();return;case "storage-access":storageSetup.show(true);return;case "glass":wallpaper.appearanceChanged();return;case "startup-preview":if(startup!=null)startup.preview();return;
             case "chrome":applySystemChrome();return;case "desktop":renderDesktop();return;case "gadgets":sidebar.setActive(true);sidebar.refresh();return;case "wallpaper":wallpaper.theme(store.prefs.getInt("wallpaper",AeroWallpaper.SEVEN));return;
             case "wallpaper-browse":chooseWallpapers(false);return;
             case "wallpaper-folder":chooseWallpapers(true);return;
@@ -1541,6 +1547,7 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
     }
     @Override protected void onActivityResult(int request,int result,Intent data){
         super.onActivityResult(request,result,data);
+        if(initialization!=null&&initialization.result(request,result,data)){if(request==REQUEST_HOME)homeRequestInFlight=false;return;}
         if(request==REQUEST_HOME){
             homeRequestInFlight=false;
             if(startMenu!=null)startMenu.refreshHome();
@@ -1643,26 +1650,16 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
         root.post(this::resumeUsageAccessGuide);
         if(startup!=null)root.post(startup::maybeShow);
     }
-    void startupSetupReady(){
-        root.post(()->{
-            if(destroyed||restoringBackup||isFinishing()||!hasWindowFocus()||usageGuide!=null||usageSettingsRequest!=0)return;
-            boolean force=restoreStorageSetup;
-            restoreStorageSetup=false;
-            storageSetup.show(force);
-            if(!storageSetup.showing()&&startup.takeUsageSetupOffer()
-                    &&!ExternalTasks.permitted(this)&&!store.usagePrefs.contains(DesktopStore.TASKBAR_USAGE)){
-                showTaskbarUsageGuide(UsageGuide.FIRST_RUN);
-            }
-        });
-    }
+    boolean initializationPending(){return initialization!=null&&initialization.pending();}
+    void startupSetupReady(){if(restoreStorageSetup){restoreStorageSetup=false;storageSetup.show(true);}}
     void storageFolderSetup(){afterDesktopReady(()->{explorer("@computer","computer");chooseLinkedFolder("@computer");});}
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);closeMediaCenter();DesktopWindow currentBrowser=windows.get("@browser");if(currentBrowser!=null&&currentBrowser.body instanceof BrowserPanel)((BrowserPanel)currentBrowser.body).exitFullScreen();handleRequestedTool();if(desktopMenu!=null)desktopMenu.dismiss();if(tray!=null)tray.dismiss();if(startMenu!=null){startMenu.hide();startMenu.refreshHome();}}
-    @Override protected void onResume(){super.onResume();taskProgressActive=true;nextDownloadPoll=0;main.removeCallbacks(taskProgressTick);if(!taskProgressSurfaces.isEmpty())main.post(taskProgressTick);if(wallpaper!=null)wallpaper.resumeSlides();if(brightness!=null)brightness.apply();if(restoringBackup)return;refreshUsageAccess();boolean access=StorageAccess.has(this);if(storageAllowed!=access){storageAllowed=access;filesChanged();}pausedSession=null;if(startMenu!=null)startMenu.refreshHome();main.removeCallbacks(clockTick);main.post(clockTick);if(store!=null)scanApps();if(sidebar!=null)sidebar.setActive(true);if(startup!=null)startup.resume();if(tray!=null)tray.start();if(weatherLocation!=null)weatherLocation.resume();for(DesktopWindow tool:windows.values()){if(tool.body instanceof TaskManagerPanel)((TaskManagerPanel)tool.body).active(true);if(tool.body instanceof GadgetPanel)((GadgetPanel)tool.body).active(true);if(tool.body instanceof BrowserPanel)((BrowserPanel)tool.body).active(true);if(tool.body instanceof PhotoGallery)((PhotoGallery)tool.body).active(true);}}
+    @Override protected void onResume(){super.onResume();if(initialization!=null)initialization.resumed();taskProgressActive=true;nextDownloadPoll=0;main.removeCallbacks(taskProgressTick);if(!taskProgressSurfaces.isEmpty())main.post(taskProgressTick);if(wallpaper!=null)wallpaper.resumeSlides();if(brightness!=null)brightness.apply();if(restoringBackup)return;refreshUsageAccess();boolean access=StorageAccess.has(this);if(storageAllowed!=access){storageAllowed=access;filesChanged();}pausedSession=null;if(startMenu!=null)startMenu.refreshHome();main.removeCallbacks(clockTick);main.post(clockTick);if(store!=null)scanApps();if(sidebar!=null)sidebar.setActive(true);if(startup!=null)startup.resume();if(tray!=null)tray.start();if(weatherLocation!=null)weatherLocation.resume();for(DesktopWindow tool:windows.values()){if(tool.body instanceof TaskManagerPanel)((TaskManagerPanel)tool.body).active(true);if(tool.body instanceof GadgetPanel)((GadgetPanel)tool.body).active(true);if(tool.body instanceof BrowserPanel)((BrowserPanel)tool.body).active(true);if(tool.body instanceof PhotoGallery)((PhotoGallery)tool.body).active(true);}}
     @Override protected void onStop(){
         if(playback!=null)playback.player.pause();
         super.onStop();
     }
-    @Override protected void onPause(){
+    @Override protected void onPause(){if(initialization!=null)initialization.paused();
         if(usageSettingsRequest!=0)usageSettingsLeft=true;
         if(taskbarReorder!=null)taskbarReorder.cancel();taskProgressActive=false;main.removeCallbacks(taskProgressTick);if(jumpMenu!=null)jumpMenu.dismiss();if(wallpaper!=null)wallpaper.pauseSlides();if(workspaceDialog!=null)workspaceDialog.dismiss();DesktopSounds.stop();if(previews!=null)previews.dismiss();for(DesktopWindow tool:windows.values()){if(tool.body instanceof PhotoGallery)((PhotoGallery)tool.body).active(false);if(tool.body instanceof BrowserPanel){((BrowserPanel)tool.body).save();((BrowserPanel)tool.body).active(false);}if(tool.body instanceof TaskManagerPanel)((TaskManagerPanel)tool.body).active(false);tool.dismissSystemMenu();tool.cancelCaptionDrag();tool.cancelResize();if(tool.body instanceof GadgetPanel)((GadgetPanel)tool.body).active(false);if(tool.body instanceof VistaExplorer)((VistaExplorer)tool.body).dismissMenus();}if(tray!=null)tray.stop();if(startup!=null)startup.pause();pausedSession=restoringBackup?null:captureSession();if(desktopMenu!=null)desktopMenu.dismiss();super.onPause();main.removeCallbacks(clockTick);if(sidebar!=null)sidebar.setActive(false);if(weatherLocation!=null)weatherLocation.pause();if(startMenu!=null)startMenu.hide();}
     @Override public void onConfigurationChanged(android.content.res.Configuration config){
@@ -1692,7 +1689,7 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
             desktopScroll.post(()->desktopScroll.scrollTo(0,session.optInt("desktopScroll")));startMenu.restore(session.optJSONObject("start"));renderTaskbar();
         }catch(JSONException ignored){}
     }
-    @Override protected void onDestroy(){destroyed=true;if(taskbarReorder!=null)taskbarReorder.close();if(usageGuide!=null){usageGuide.dismiss();usageGuide=null;}if(playback!=null)playback.release();if(wallpaper!=null)wallpaper.close();if(previews!=null)previews.dismiss();DesktopSounds.stop();if(storageSetup!=null)storageSetup.close();if(weatherLocation!=null)weatherLocation.close();if(tray!=null)tray.stop();if(startup!=null)startup.close();main.removeCallbacksAndMessages(null);worker.shutdownNow();for(DesktopWindow tool:windows.values()){if(tool.body instanceof VistaShell)((VistaShell)tool.body).close();if(tool.body instanceof WeatherPanel)((WeatherPanel)tool.body).close();if(tool.body instanceof BrowserPanel)((BrowserPanel)tool.body).close();if(tool.body instanceof PhotoGallery)((PhotoGallery)tool.body).close();if(tool.body instanceof TaskManagerPanel)((TaskManagerPanel)tool.body).close();if(tool.body instanceof RecyclePanel)((RecyclePanel)tool.body).close();}if(sidebar!=null)sidebar.close();if(weatherLocation!=null)weatherLocation.pause();if(receiverRegistered){unregisterReceiver(packages);unregisterReceiver(timeChanged);}if(Build.VERSION.SDK_INT>=33&&backCallback!=null)getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backCallback);super.onDestroy();}
+    @Override protected void onDestroy(){if(initialization!=null)initialization.close();destroyed=true;if(taskbarReorder!=null)taskbarReorder.close();if(usageGuide!=null){usageGuide.dismiss();usageGuide=null;}if(playback!=null)playback.release();if(wallpaper!=null)wallpaper.close();if(previews!=null)previews.dismiss();DesktopSounds.stop();if(storageSetup!=null)storageSetup.close();if(weatherLocation!=null)weatherLocation.close();if(tray!=null)tray.stop();if(startup!=null)startup.close();main.removeCallbacksAndMessages(null);worker.shutdownNow();for(DesktopWindow tool:windows.values()){if(tool.body instanceof VistaShell)((VistaShell)tool.body).close();if(tool.body instanceof WeatherPanel)((WeatherPanel)tool.body).close();if(tool.body instanceof BrowserPanel)((BrowserPanel)tool.body).close();if(tool.body instanceof PhotoGallery)((PhotoGallery)tool.body).close();if(tool.body instanceof TaskManagerPanel)((TaskManagerPanel)tool.body).close();if(tool.body instanceof RecyclePanel)((RecyclePanel)tool.body).close();}if(sidebar!=null)sidebar.close();if(weatherLocation!=null)weatherLocation.pause();if(receiverRegistered){unregisterReceiver(packages);unregisterReceiver(timeChanged);}if(Build.VERSION.SDK_INT>=33&&backCallback!=null)getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backCallback);super.onDestroy();}
 
     void enterBrowserFullscreen(View video){enterFullscreen(video,"Fullscreen video");}
     private void enterFullscreen(View video,String description){
@@ -1738,5 +1735,5 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
     }
     private void updateWeatherSummary(){DesktopWindow current=windows.get("@weather");if(current!=null&&current.body instanceof WeatherPanel)((WeatherPanel)current.body).refresh();}
     private void locateWeather(){if(weatherLocation==null)return;if(!weatherLocation.permitted()){requestPermissions(new String[]{android.Manifest.permission.ACCESS_COARSE_LOCATION},42);return;}weatherLocation.locate();}
-    @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){super.onRequestPermissionsResult(request,permissions,grants);DesktopWindow browser=windows.get("@browser");if(browser!=null&&browser.getParent()!=null&&browser.body instanceof BrowserPanel&&((BrowserPanel)browser.body).permissionResult(request))return;if(request==StorageAccess.REQUEST){boolean access=StorageAccess.has(this);storageAllowed=access;filesChanged();if(!access)toast("File access was not enabled. You can still connect individual folders.");return;}if(request==42){if(grants.length>0&&grants[0]==android.content.pm.PackageManager.PERMISSION_GRANTED)weatherLocation.locate();else weatherLocation.denied();}}
+    @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){super.onRequestPermissionsResult(request,permissions,grants);if(initialization!=null)initialization.permissionResult(request);DesktopWindow browser=windows.get("@browser");if(browser!=null&&browser.getParent()!=null&&browser.body instanceof BrowserPanel&&((BrowserPanel)browser.body).permissionResult(request))return;if(request==StorageAccess.REQUEST){boolean access=StorageAccess.has(this);storageAllowed=access;filesChanged();if(!access)toast("File access was not enabled. You can still connect individual folders.");return;}if(request==42){if(grants.length>0&&grants[0]==android.content.pm.PackageManager.PERMISSION_GRANTED)weatherLocation.locate();else weatherLocation.denied();}}
 }

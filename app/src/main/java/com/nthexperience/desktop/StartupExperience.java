@@ -53,11 +53,11 @@ final class StartupExperience {
     }
     private void watchEarlyBoot(){if(resumed&&store.prefs.getInt("startup_mode",0)==1&&SystemClock.uptimeMillis()<bootWatchDeadline)host.postDelayed(reconsider,1000);}
     private void finishSetup(){
-        if(!resumed||!activity.hasWindowFocus()||activity.offerInitialHome(session))return;
+        if(!resumed||!activity.hasWindowFocus()||activity.initializationPending())return;
         if(!welcomeChecked){
             welcomeChecked=true;
             boolean firstWelcome=!session.getBoolean("welcome_seen",false);
-            if(firstWelcome)session.edit().putBoolean("welcome_seen",true).putBoolean(USAGE_SETUP_PENDING,true).apply();
+            if(firstWelcome)session.edit().putBoolean("welcome_seen",true).apply();
             if(firstWelcome||welcomeAtStart)welcome.run();
         }
         activity.startupSetupReady();
