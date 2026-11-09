@@ -59,6 +59,7 @@ public final class SevenPolishSmoke extends Instrumentation {
         await(()->keys().equals(Arrays.asList("@notes","@files","@calendar")),"Three real pinned slots");
         View first=slot("@notes"),last=slot("@calendar");Rect from=bounds(first),to=bounds(last);
         pointer(MotionEvent.ACTION_DOWN,from.centerX(),from.centerY());SystemClock.sleep(210);
+        ui(()->{try{java.lang.reflect.Method refresh=MainActivity.class.getDeclaredMethod("renderTaskbar");refresh.setAccessible(true);refresh.invoke(home);check(slot("@notes")==first,"Catalog refresh preserves the pressed taskbar button before drag starts");}catch(ReflectiveOperationException failure){throw new AssertionError(failure);}});
         pointer(MotionEvent.ACTION_MOVE,from.centerX()+dp(18),from.centerY());SystemClock.sleep(120);
         for(int step=1;step<=6;step++){pointer(MotionEvent.ACTION_MOVE,from.centerX()+(to.right-from.centerX()-2)*step/6f,from.centerY());SystemClock.sleep(40);}
         pointer(MotionEvent.ACTION_UP,to.right-2,from.centerY());

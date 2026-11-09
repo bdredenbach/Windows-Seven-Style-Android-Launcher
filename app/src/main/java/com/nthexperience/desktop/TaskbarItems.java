@@ -2,11 +2,19 @@ package com.nthexperience.desktop;
 
 import android.content.Context;
 import android.view.View;
+import android.view.MotionEvent;
 import android.widget.LinearLayout;
 
 /** Two 48dp rows keep every button at its normal touch size; overflow still scrolls. */
 final class TaskbarItems extends LinearLayout {
     boolean expanded;
+    private boolean touching;
+    boolean touching(){return touching;}
+    @Override public boolean dispatchTouchEvent(MotionEvent event){
+        if(event.getActionMasked()==MotionEvent.ACTION_DOWN)touching=true;
+        try{boolean handled=super.dispatchTouchEvent(event);if(event.getActionMasked()==MotionEvent.ACTION_DOWN&&!handled)touching=false;return handled;}finally{if(event.getActionMasked()==MotionEvent.ACTION_UP||event.getActionMasked()==MotionEvent.ACTION_CANCEL)touching=false;}
+    }
+    @Override protected void onDetachedFromWindow(){touching=false;super.onDetachedFromWindow();}
     TaskbarItems(Context context,boolean expanded){super(context);this.expanded=expanded;}
     void expanded(boolean value){if(expanded!=value){expanded=value;requestLayout();}}
     @Override protected void onMeasure(int width,int height){

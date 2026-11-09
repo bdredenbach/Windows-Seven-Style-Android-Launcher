@@ -186,12 +186,20 @@
     "app/src/main/java/com/nthexperience/desktop/WeatherLocation.java": {
       "sha256": "892ec0c206e9e1a6d730519b103da06809972b28e7c32fce9a22367491c7c4a5",
       "reason": "Accept approximate grants and use precise/GPS access only when granted."
+    },
+    "app/src/main/java/com/nthexperience/desktop/TaskbarItems.java": {
+      "sha256": "a5deaf0d37c8ee75c78afe7090428ef7e4ea520a44c542344596cf2c696933f9",
+      "reason": "Track a pressed taskbar button so catalog refresh cannot detach its touch/drag source."
     }
   },
   "approved_shell_changes": {
     "layoutWorkspace": {
       "sha256": "efe6774f9e0875f8adb2222f9a7004f6ce59496b1696f43136ff2ae1b6ab716d",
       "reason": "Use the actual taskbar viewport to fit complete icon rows; preserve saved coordinates."
+    },
+    "renderTaskbar": {
+      "sha256": "a15641064db4bd9a7ac38d416b2b29a390d4a4db6167bbcb71e15b9b9250221f",
+      "reason": "Defer taskbar refresh during the initial pointer gesture; retain the established Seven render body and bottom-row controls."
     }
   }
 }
