@@ -2,6 +2,8 @@
 
 Nth Desktop Seven is a Windows 7–inspired Android home launcher. Its first test build, **0.1.0**, adds Aero Snap and installs alongside Nth Desktop Vista under the separate app ID `com.nthexperience.desktop.seven`.
 
+**0.7.1** keeps Start, the taskbar command separator, notification controls, clock and Show desktop in the original bottom row when the taskbar expands. The extra space is used by the app-button rows. It updates 0.7.0 using the same saved Seven signing key.
+
 **0.7.0 requires a fresh installation.** It uses a new saved Seven signing certificate. Export your desktop backup and separately save app-created files before removing an older Seven installation; restore the backup and regrant access after installing. Keep the private signing backup for future in-place updates.
 
 **0.7.0** adds an optional second taskbar row, available from the taskbar hold menu and Control Panel → Taskbar and Start Menu. It preserves desktop icon spacing and floating-window positions during taskbar resizing; task slots retain their order when another tool opens. Both rows support previews, Jump Lists, reordering and overflow scrolling. The row preference is included in desktop backups.

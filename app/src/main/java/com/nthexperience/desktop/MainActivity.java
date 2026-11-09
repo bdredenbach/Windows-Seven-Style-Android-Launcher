@@ -221,6 +221,13 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
         int height=dp(expanded?102:54),itemsHeight=dp(expanded?96:48);
         ViewGroup.LayoutParams outer=taskbarView.getLayoutParams();if(outer.height!=height){outer.height=height;taskbarView.setLayoutParams(outer);}
         ViewGroup.LayoutParams clip=taskClip.getLayoutParams();if(clip.height!=itemsHeight){clip.height=itemsHeight;taskClip.setLayoutParams(clip);}
+        // Keep shell controls centered in the original bottom row, independently of the app rows.
+        for(int i=0;i<taskbarView.getChildCount();i++){
+            View child=taskbarView.getChildAt(i);LinearLayout.LayoutParams position=(LinearLayout.LayoutParams)child.getLayoutParams();
+            int anchorHeight=child==taskClip?height:dp(54);
+            int bottom=Math.max(0,(anchorHeight-position.height+1)/2);
+            if(position.gravity!=Gravity.BOTTOM||position.bottomMargin!=bottom){position.gravity=Gravity.BOTTOM;position.bottomMargin=bottom;child.setLayoutParams(position);}
+        }
     }
     private void setTaskbarExpanded(boolean expanded){
         store.prefs.edit().putBoolean("taskbar_expanded",expanded).apply();

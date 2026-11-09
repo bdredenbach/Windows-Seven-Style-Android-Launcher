@@ -34,14 +34,18 @@ public final class SevenTaskbarRowsSmoke extends Instrumentation {
             ui(()->{home.setRequestedOrientation(orientation);store.prefs.edit().putBoolean("taskbar_expanded",false).putInt("desktop_rows_portrait",8).putInt("desktop_rows_landscape",3).commit();refresh();find(root,v->v instanceof DesktopIconGrid).requestLayout();});
             await(()->portrait?root.getHeight()>root.getWidth():root.getWidth()>root.getHeight(),"Orientation");settle();
             ui(()->home.open("setting:page:taskbar"));settle();DesktopWindow control=window("@control");check(control!=null,"Taskbar Control Panel opens");FrameLayout workspace=(FrameLayout)control.getParent();
-            Map<String,Rect> icons=icons();List<String> order=keys();int height=workspace.getHeight();
+            Map<String,Rect> icons=icons();List<String> order=keys();Map<Integer,Rect> controls=systemControls();int height=workspace.getHeight();
             for(int pass=0;pass<3;pass++){
-                toggle(true);check(height-workspace.getHeight()==dp(48),"Expansion adds exactly one app row");
+                toggle(true);check(height-workspace.getHeight()==dp(48),"Expansion adds exactly one app row");check(controls.equals(systemControls()),"Start, separator, tray, clock and Show desktop stay at exactly the same bottom-row pixels");
                 check(icons.equals(icons()),"Configured desktop rows keep icon geometry when expanding: before="+icons+" after="+icons());check(order.equals(keys()),"Expansion preserves slot order");
                 ui(()->{TaskbarItems items=items();check(items.getHeight()==dp(96),"Two complete rows");check(items.getChildAt(0).getTop()==0&&items.getChildAt(1).getTop()==dp(48),"Buttons occupy both rows");});
-                for(int repeat=0;repeat<4;repeat++){ui(()->{root.requestApplyInsets();workspace.requestLayout();});settle();check(icons.equals(icons()),"Repeated layout does not bounce desktop icons");}
-                toggle(false);check(height==workspace.getHeight(),"Normal workspace returns");check(icons.equals(icons()),"Collapse preserves desktop icon geometry");
+                for(int repeat=0;repeat<4;repeat++){ui(()->{root.requestApplyInsets();workspace.requestLayout();});settle();check(icons.equals(icons()),"Repeated layout does not bounce desktop icons");check(controls.equals(systemControls()),"Repeated layouts keep system controls bottom anchored");}
+                toggle(false);check(height==workspace.getHeight(),"Normal workspace returns");check(icons.equals(icons()),"Collapse preserves desktop icon geometry");check(controls.equals(systemControls()),"Collapse preserves all bottom-row system bounds");
             }
+            View arrow=find(root,v->"Device controls".equals(v.getContentDescription()));ui(arrow::performClick);settle();Map<Integer,Rect> expandedTrayControls=systemControls();
+            toggle(true);check(expandedTrayControls.equals(systemControls()),"Expanded notification icons stay bottom anchored");
+            SystemTray expandedTray=(SystemTray)find(root,v->v instanceof SystemTray);for(int i=0;i<expandedTray.getChildCount();i++){View icon=expandedTray.getChildAt(i);if(icon.isShown())check(screen(icon).bottom<=screen(expandedTray).bottom&&screen(icon).top>=screen(expandedTray).top,"Notification button fits the bottom row");}
+            toggle(false);check(expandedTrayControls.equals(systemControls()),"Expanded tray stays fixed while taskbar collapses");ui(arrow::performClick);settle();
             toggle(true);Map<String,Rect> positions=taskPositions();ui(()->home.open("@taskmanager"));settle();Map<String,Rect> added=taskPositions();for(String id:positions.keySet())check(positions.get(id).equals(added.get(id)),"Opening another task keeps existing row assignments: "+id);
             ui(()->window("@taskmanager").closeWindow());settle();
             // Real hold on Seven's taskbar grip, then a real context-menu action.
@@ -79,6 +83,7 @@ public final class SevenTaskbarRowsSmoke extends Instrumentation {
     private TaskbarItems items(){return (TaskbarItems)find(root,v->v instanceof TaskbarItems);}
     private List<String> keys(){List<String> ids=new ArrayList<>();TaskbarItems items=items();for(int i=0;i<items.getChildCount();i++){String key=TaskbarReorder.key(items.getChildAt(i));if(key!=null)ids.add(key);}return ids;}
     private View slot(String id){return find(items(),v->id.equals(TaskbarReorder.key(v)));}
+    private Map<Integer,Rect> systemControls(){Map<Integer,Rect> out=new LinkedHashMap<>();ViewGroup bar=(ViewGroup)find(root,v->"Desktop taskbar".equals(v.getContentDescription()));for(int i=0;i<bar.getChildCount();i++){View child=bar.getChildAt(i);if(find(child,v->v instanceof TaskbarItems)==null)out.put(i,screen(child));}return out;}
     private Map<String,Rect> taskPositions(){Map<String,Rect> out=new LinkedHashMap<>();for(String id:keys()){View v=slot(id);out.put(id,new Rect(v.getLeft(),v.getTop(),v.getRight(),v.getBottom()));}return out;}
     private Map<String,Rect> icons(){Map<String,Rect> out=new LinkedHashMap<>();DesktopIconGrid grid=(DesktopIconGrid)find(root,v->v instanceof DesktopIconGrid);for(int i=0;i<grid.getChildCount();i++){View v=grid.getChildAt(i);out.put(String.valueOf(v.getTag()),new Rect(v.getLeft(),v.getTop(),v.getRight(),v.getBottom()));}return out;}
     private View find(View root,Predicate<View> match){if(root==null)return null;if(match.test(root))return root;if(root instanceof ViewGroup)for(int i=0;i<((ViewGroup)root).getChildCount();i++){View found=find(((ViewGroup)root).getChildAt(i),match);if(found!=null)return found;}return null;}
