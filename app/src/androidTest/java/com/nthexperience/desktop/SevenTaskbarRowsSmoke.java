@@ -31,13 +31,13 @@ public final class SevenTaskbarRowsSmoke extends Instrumentation {
         check(!store.prefs.getBoolean("taskbar_expanded",false),"Fresh Seven uses one row");
         for(int orientation:new int[]{ActivityInfo.SCREEN_ORIENTATION_PORTRAIT,ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE}){
             boolean portrait=orientation==ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
-            ui(()->{home.setRequestedOrientation(orientation);store.prefs.edit().putInt("desktop_rows_portrait",8).putInt("desktop_rows_landscape",3).commit();});
+            ui(()->{home.setRequestedOrientation(orientation);store.prefs.edit().putInt("desktop_rows_portrait",8).putInt("desktop_rows_landscape",3).commit();refresh();});
             await(()->portrait?root.getHeight()>root.getWidth():root.getWidth()>root.getHeight(),"Orientation");settle();
             ui(()->home.open("setting:page:taskbar"));settle();DesktopWindow control=window("@control");check(control!=null,"Taskbar Control Panel opens");FrameLayout workspace=(FrameLayout)control.getParent();
             Map<String,Rect> icons=icons();List<String> order=keys();int height=workspace.getHeight();
             for(int pass=0;pass<3;pass++){
                 toggle(true);check(height-workspace.getHeight()==dp(48),"Expansion adds exactly one app row");
-                check(icons.equals(icons()),"Configured desktop rows keep icon geometry when expanding");check(order.equals(keys()),"Expansion preserves slot order");
+                check(icons.equals(icons()),"Configured desktop rows keep icon geometry when expanding: before="+icons+" after="+icons());check(order.equals(keys()),"Expansion preserves slot order");
                 ui(()->{TaskbarItems items=items();check(items.getHeight()==dp(96),"Two complete rows");check(items.getChildAt(0).getTop()==0&&items.getChildAt(1).getTop()==dp(48),"Buttons occupy both rows");});
                 for(int repeat=0;repeat<4;repeat++){ui(()->{root.requestApplyInsets();workspace.requestLayout();});settle();check(icons.equals(icons()),"Repeated layout does not bounce desktop icons");}
                 toggle(false);check(height==workspace.getHeight(),"Normal workspace returns");check(icons.equals(icons()),"Collapse preserves desktop icon geometry");
