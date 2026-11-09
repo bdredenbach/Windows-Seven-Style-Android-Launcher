@@ -6,6 +6,7 @@ import android.content.pm.ActivityInfo;
 import android.graphics.*;
 import android.os.*;
 import android.view.*;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.*;
 import java.io.*;
 import java.lang.reflect.*;
@@ -45,7 +46,7 @@ public final class SevenTaskbarRowsSmoke extends Instrumentation {
             ui(()->window("@taskmanager").closeWindow());settle();
             // Real hold on Seven's taskbar grip, then a real context-menu action.
             View grip=find(root,v->"Taskbar commands".equals(v.getContentDescription()));Rect g=screen(grip);down=SystemClock.uptimeMillis();input(MotionEvent.ACTION_DOWN,g.centerX(),g.centerY());Thread.sleep(650);input(MotionEvent.ACTION_UP,g.centerX(),g.centerY());
-            View menu=awaitView(v->v instanceof TextView&&LABEL.contentEquals(((TextView)v).getText())&&!(v instanceof CheckBox));ui(menu::performClick);settle();check(!store.prefs.getBoolean("taskbar_expanded",true),"Hold-menu item collapses the bar");
+            clickMenu();settle();check(!store.prefs.getBoolean("taskbar_expanded",true),"Hold-menu item collapses the bar");
             // Opening the properties page again must show the same value.
             ui(()->home.open("setting:page:taskbar"));settle();check(!((CheckBox)find(control.body,v->v instanceof CheckBox&&LABEL.contentEquals(((CheckBox)v).getText()))).isChecked(),"Control Panel mirrors the hold-menu switch");
             ui(()->control.arrange(dp(12),workspace.getHeight()-dp(portrait?230:195),Math.min(dp(310),workspace.getWidth()-dp(24)),dp(portrait?200:180)));settle();
@@ -78,7 +79,8 @@ public final class SevenTaskbarRowsSmoke extends Instrumentation {
     private Map<String,Rect> taskPositions(){Map<String,Rect> out=new LinkedHashMap<>();for(String id:keys()){View v=slot(id);out.put(id,new Rect(v.getLeft(),v.getTop(),v.getRight(),v.getBottom()));}return out;}
     private Map<String,Rect> icons(){Map<String,Rect> out=new LinkedHashMap<>();DesktopIconGrid grid=(DesktopIconGrid)find(root,v->v instanceof DesktopIconGrid);for(int i=0;i<grid.getChildCount();i++){View v=grid.getChildAt(i);out.put(String.valueOf(v.getTag()),new Rect(v.getLeft(),v.getTop(),v.getRight(),v.getBottom()));}return out;}
     private View find(View root,Predicate<View> match){if(root==null)return null;if(match.test(root))return root;if(root instanceof ViewGroup)for(int i=0;i<((ViewGroup)root).getChildCount();i++){View found=find(((ViewGroup)root).getChildAt(i),match);if(found!=null)return found;}return null;}
-    private View awaitView(Predicate<View> p)throws Exception{View[] found={null};await(()->(found[0]=find(root,p))!=null,"Menu appears");return found[0];}
+    private AccessibilityNodeInfo menuNode(AccessibilityNodeInfo node){if(node==null)return null;if(LABEL.contentEquals(node.getContentDescription()==null?"":node.getContentDescription())&&node.isClickable())return node;for(int i=0;i<node.getChildCount();i++){AccessibilityNodeInfo found=menuNode(node.getChild(i));if(found!=null)return found;}return null;}
+    private void clickMenu()throws Exception{long end=SystemClock.uptimeMillis()+10000;while(SystemClock.uptimeMillis()<end){AccessibilityNodeInfo node=menuNode(getUiAutomation().getRootInActiveWindow());if(node!=null){check(node.performAction(AccessibilityNodeInfo.ACTION_CLICK),"Menu control clicks");return;}Thread.sleep(100);}throw new AssertionError("Held taskbar menu appears");}
     private void await(BooleanSupplier test,String label)throws Exception{long end=SystemClock.uptimeMillis()+10000;while(SystemClock.uptimeMillis()<end){boolean[] done={false};ui(()->done[0]=test.getAsBoolean());if(done[0])return;Thread.sleep(80);}throw new AssertionError(label);}
     private void ui(Runnable action)throws Exception{FutureTask<Void> task=new FutureTask<>(action,null);new Handler(Looper.getMainLooper()).post(task);try{task.get(8,TimeUnit.SECONDS);}catch(ExecutionException e){throw new RuntimeException(e.getCause());}}
     private void settle()throws Exception{waitForIdleSync();Thread.sleep(240);waitForIdleSync();}

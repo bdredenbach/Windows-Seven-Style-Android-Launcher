@@ -15,8 +15,10 @@ adb shell input keyevent KEYCODE_WAKEUP
 adb shell wm dismiss-keyguard
 for runner in SevenTaskbarRowsSmoke SevenPolishSmoke SnapSmoke; do
  adb shell am force-stop "$launcher"
+ adb shell pm clear "$launcher"
  log=seven-rows-${runner}.txt
  timeout -k 3s 300s adb shell am instrument -w "$launcher.test/com.nthexperience.desktop.$runner" | tee "$log"
  grep -q 'PASS:' "$log"
  ! grep -Eq 'FAIL:|shortMsg=|Process crashed|INSTRUMENTATION_FAILED' "$log"
+ collect
 done
