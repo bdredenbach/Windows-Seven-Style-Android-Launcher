@@ -1,0 +1,70 @@
+name: Seven signed handoff validation
+on:
+  push:
+    branches: [build/seven-complete-signed-fixes]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: seven-handoff-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [30, 36]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+      - run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Check original desktop preservation
+        run: python3 checks/CheckSevenBaseline.py --version-name 0.7.2 --version-code 25
+      - name: Run unit tests and compile application and instrumentation
+        run: ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon
+      - name: Check packaged instrumentation
+        run: python3 checks/CheckTestManifest.py
+      - name: Keep verification tool
+        run: |
+          mkdir -p build/signing-tool
+          cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" build/signing-tool/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Seven-0.7.2-build-api-${{ matrix.api }}
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            app/build/test-results/testDebugUnitTest/
+            build/signing-tool/apksigner.jar
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          emulator-build: 15917651
+          arch: x86_64
+          target: ${{ matrix.api == 30 && 'default' || 'aosp_atd' }}
+          profile: pixel_2
+          ram-size: 2048M
+          heap-size: 384M
+          emulator-options: -no-window -gpu swiftshader -feature -Vulkan -no-snapshot -noaudio -no-boot-anim
+          disable-animations: true
+          emulator-boot-timeout: 300
+          script: bash checks/run-seven-handoff.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Seven-0.7.2-native-api-${{ matrix.api }}
+          path: build/handoff-evidence/

@@ -26,6 +26,7 @@ public final class SevenTaskbarRowsSmoke extends Instrumentation {
         store.desktop(Arrays.asList("@computer","@recycle","@notes","@calendar","@photos","@control","@browser","@weather","@taskmanager","@files"));
         getTargetContext().getSharedPreferences(StorageAccess.PREFS,0).edit().putBoolean("seen",true).commit();
         getTargetContext().getSharedPreferences(StartupExperience.SESSION,0).edit().putBoolean("seen",true).putBoolean("welcome_seen",true).putBoolean(StartupExperience.HOME_OFFERED,true).commit();
+        getTargetContext().getSharedPreferences(InitializationState.PREFS,0).edit().putInt("flow_version",2).putInt("step",InitializationState.Step.DONE.ordinal()).commit();
         home=(MainActivity)startActivitySync(new Intent(Intent.ACTION_MAIN).setComponent(new ComponentName(getTargetContext(),MainActivity.class)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));root=home.getWindow().getDecorView();
         await(()->find(root,v->"Start menu".equals(v.getContentDescription()))!=null,"Desktop starts");settle();
         check(!store.prefs.getBoolean("taskbar_expanded",false),"Fresh Seven uses one row");

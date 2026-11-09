@@ -9,6 +9,10 @@ final class InitializationState {
     enum Step { HOME, FILES, USAGE, NOTIFICATIONS, BRIGHTNESS, LOCATION, FOLDERS, DONE }
     final SharedPreferences prefs;
     InitializationState(Context context){prefs=context.getSharedPreferences(PREFS,0);
+        // Pre-flow releases recorded completion in the startup session. Preserve those
+        // choices on update and offer only the newly added optional location step.
+        if(!prefs.contains("step")&&context.getSharedPreferences(StartupExperience.SESSION,0).getBoolean("welcome_seen",false))
+            prefs.edit().putInt("step",Step.LOCATION.ordinal()).putInt("flow_version",2).commit();
         // v1 used 5 for folder repair and 6 for Done. Offer the newly added location step once.
         if(prefs.getInt("flow_version",1)<2){int old=prefs.getInt("step",0);prefs.edit().putInt("step",old>=5?Step.LOCATION.ordinal():Math.max(0,old)).putInt("flow_version",2).commit();}
     }

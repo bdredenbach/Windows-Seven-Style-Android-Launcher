@@ -53,6 +53,7 @@ public final class SnapSmoke extends Instrumentation {
                     .putBoolean("seen", true).putBoolean("welcome_seen", true)
                     .putBoolean(StartupExperience.HOME_OFFERED, true).commit();
             progress("launching Seven for native Snap checks");
+            target.getSharedPreferences(InitializationState.PREFS,0).edit().putInt("flow_version",2).putInt("step",InitializationState.Step.DONE.ordinal()).commit();
             home = (MainActivity) startActivitySync(new Intent(Intent.ACTION_MAIN)
                     .setComponent(new ComponentName(target, MainActivity.class))
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));

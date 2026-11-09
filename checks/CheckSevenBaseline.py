@@ -3,6 +3,12 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--version-name', default='0.7.1')
+parser.add_argument('--version-code', type=int, default=24)
+release = parser.parse_args()
 
 ROOT = Path(__file__).resolve().parent.parent
 baseline = json.loads((ROOT / 'checks/seven-071-baseline.json').read_text())
@@ -43,8 +49,8 @@ original_icon = icon[:start] + icon[end:].replace('    private void drawArtwork(
 assert hashlib.sha256(original_icon.encode()).hexdigest() == baseline['unchanged_runtime_files'][icon_path], 'Original icon artwork changed'
 
 build = (ROOT / 'app/build.gradle').read_text()
-assert "versionName '0.7.1'" in build
-assert "versionCode 24" in build
+assert "versionName '%s'" % release.version_name in build
+assert re.search(r'\bversionCode\s+' + str(release.version_code) + r'\b', build)
 assert "com.nthexperience.desktop.seven" in (ROOT / "build.gradle").read_text()
 print('PASS: Seven 0.7.1 identity, original icon artwork, %d unchanged runtime files, %d unchanged shell methods and explicitly pinned requested fixes' % (
     len(baseline['unchanged_runtime_files'])-len(baseline['approved_runtime_changes']), len(baseline['shell_methods'])-len(baseline['approved_shell_changes'])))
