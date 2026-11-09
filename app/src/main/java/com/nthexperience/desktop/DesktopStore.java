@@ -14,6 +14,17 @@ import org.json.JSONObject;
 final class DesktopStore {
     static final int MAX_FOLDERS=64, MAX_ITEMS=256, MAX_QUICK=12;
     static final String TASKBAR_USAGE="taskbar_usage";
+    private static final class ObjectModel {final String raw;final JSONObject value;ObjectModel(String raw,JSONObject value){this.raw=raw;this.value=value;}}
+    private static final class ListModel {final String raw;final List<String> value;ListModel(String raw,List<String> value){this.raw=raw;this.value=value;}}
+    private final java.util.Map<String,ObjectModel> objectModels=new java.util.HashMap<>();
+    private final java.util.Map<String,ListModel> listModels=new java.util.HashMap<>();
+    // Only internal read paths use these snapshots; public mutable folder objects remain independent.
+    private synchronized JSONObject objectModel(String key){
+        String raw;try{raw=prefs.getString(key,"{}");}catch(ClassCastException invalid){raw="{}";}
+        ObjectModel previous=objectModels.get(key);if(previous!=null&&java.util.Objects.equals(previous.raw,raw))return previous.value;
+        JSONObject value;try{value=new JSONObject(raw);}catch(JSONException invalid){value=new JSONObject();}
+        objectModels.put(key,new ObjectModel(raw,value));return value;
+    }
     final SharedPreferences prefs,usagePrefs;
     final Context context;
     DesktopStore(Context context) { this.context=context.getApplicationContext();prefs = context.getSharedPreferences("desktop", Context.MODE_PRIVATE);usagePrefs=context.getSharedPreferences("usage_access",Context.MODE_PRIVATE); }
@@ -46,10 +57,10 @@ final class DesktopStore {
     List<String> quickLaunch(){return list("quick_launch",Arrays.asList("@browser","@files",MediaLibrary.PLAYER));}
     void quickLaunch(List<String> ids){prefs.edit().remove(TaskbarOrder.KEY).apply();save("quick_launch",ids.subList(0,Math.min(MAX_QUICK,ids.size())));}
     JSONObject folders(){return object("app_folders");}
-    JSONObject folder(String id){return folders().optJSONObject(id);}
-    boolean isFolder(String id){return id!=null&&id.startsWith("folder:")&&folder(id)!=null;}
+    JSONObject folder(String id){return id!=null&&id.startsWith("folder:")?folders().optJSONObject(id):null;}
+    boolean isFolder(String id){return id!=null&&id.startsWith("folder:")&&objectModel("app_folders").optJSONObject(id)!=null;}
     List<String> folderItems(String id){JSONObject folder=folder(id);return array(folder==null?null:folder.optJSONArray("items"));}
-    String name(String id,String fallback){JSONObject folder=folder(id);if(folder!=null)return folder.optString("name","Folder");return object("shortcut_names").optString(id,fallback);}
+    String name(String id,String fallback){JSONObject folder=id!=null&&id.startsWith("folder:")?objectModel("app_folders").optJSONObject(id):null;if(folder!=null)return folder.optString("name","Folder");return objectModel("shortcut_names").optString(id,fallback);}
     void rename(String id,String name){
         name=cleanName(name);if(name.isEmpty())throw new IllegalArgumentException("Enter a name");
         JSONObject all=folders(),folder=all.optJSONObject(id);
@@ -127,15 +138,13 @@ final class DesktopStore {
     static List<String> array(JSONArray values){List<String> result=new ArrayList<>();if(values!=null)for(int i=0;i<values.length();i++){Object item=values.opt(i);if(item instanceof String)result.add((String)item);}return LauncherState.normalize(result);}
     private List<String> leafItems(List<String> items){List<String> result=new ArrayList<>();for(String id:LauncherState.normalize(items))if(!id.startsWith("folder:")&&result.size()<MAX_ITEMS)result.add(id);return result;}
     private JSONObject object(String key){try{return new JSONObject(prefs.getString(key,"{}"));}catch(JSONException|ClassCastException ex){return new JSONObject();}}
-    private List<String> list(String key, List<String> fallback) {
-        try {
-            String saved = prefs.getString(key, null);
-            if (saved == null) return new ArrayList<>(fallback);
-            JSONArray array = new JSONArray(saved);
-            List<String> result = new ArrayList<>();
-            for (int i = 0; i < array.length(); i++) result.add(array.getString(i));
-            return LauncherState.normalize(result);
-        } catch (JSONException | ClassCastException ex) { return new ArrayList<>(fallback); }
+    private synchronized List<String> list(String key,List<String> fallback){
+        try{
+            String raw=prefs.getString(key,null);if(raw==null)return new ArrayList<>(fallback);
+            ListModel model=listModels.get(key);if(model!=null&&raw.equals(model.raw))return new ArrayList<>(model.value);
+            JSONArray array=new JSONArray(raw);List<String> values=new ArrayList<>();for(int i=0;i<array.length();i++)values.add(array.getString(i));
+            values=LauncherState.normalize(values);listModels.put(key,new ListModel(raw,java.util.Collections.unmodifiableList(values)));return new ArrayList<>(values);
+        }catch(JSONException|ClassCastException invalid){return new ArrayList<>(fallback);}
     }
     void desktop(List<String> ids) { save("shortcuts", ids); }
     void launched(String id) { save("recents", LauncherState.recent(recents(), id)); }

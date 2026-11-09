@@ -44,6 +44,7 @@ final class ActionCenter extends LinearLayout {
         LinearLayout content=Aero.column(getContext());Aero.pad(content,14);scroll.addView(content);
         addView(scroll,new LayoutParams(-1,-1));
         heading(content,"Action Center");
+        content.addView(new PhoneNotifications(getContext()));
         if(host.isHome())line(content,"Nth Desktop Seven is the default Home app.");
         else action(content,"Choose the default Home app…",host::home);
         if(!StorageAccess.has(getContext()))action(content,"Review device file access…",host::fileSetup);
