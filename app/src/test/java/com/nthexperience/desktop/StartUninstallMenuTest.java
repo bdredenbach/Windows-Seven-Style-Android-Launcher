@@ -32,5 +32,17 @@ public class StartUninstallMenuTest {
   menu.entries(Collections.singletonList(new AppCatalog.Entry(ID,NAME,new ColorDrawable())));menu.show(false);ListView list=ReflectionHelpers.getField(menu,"list");int at=-1;for(int i=0;i<list.getAdapter().getCount();i++)if(((StartSearch.Result)list.getAdapter().getItem(i)).id.equals(ID)){at=i;break;}assertTrue(at>=0);View row=list.getAdapter().getView(at,null,list);root.addView(row,new FrameLayout.LayoutParams(300,48));row.layout(0,0,300,48);
   assertTrue(list.getOnItemLongClickListener().onItemLongClick(list,row,at,at));popup().dismiss();assertTrue(list.performItemClick(row,at,at));assertEquals(ID,opened);assertTrue(row.performContextClick());PopupWindow popup=popup();find(popup.getContentView(),"Uninstall").performClick();assertDelete();
  }
+ @Test public void theContextClickableAppRowItselfAlsoOpensOnTap(){
+  menu.entries(Collections.singletonList(new AppCatalog.Entry(ID,NAME,new ColorDrawable())));menu.show(false);ListView list=ReflectionHelpers.getField(menu,"list");View row=list.getAdapter().getView(0,null,list);
+  assertTrue(row.performClick());assertEquals(ID,opened);
+ }
+ @Test public void holdingTheAppRowItselfExposesUninstallWithoutOpeningTheApp(){
+  menu.entries(Collections.singletonList(new AppCatalog.Entry(ID,NAME,new ColorDrawable())));menu.show(false);ListView list=ReflectionHelpers.getField(menu,"list");View row=list.getAdapter().getView(0,null,list);root.addView(row,new FrameLayout.LayoutParams(300,48));row.layout(0,0,300,48);
+  assertTrue(row.performLongClick());assertNull(opened);PopupWindow popup=popup();find(popup.getContentView(),"Uninstall").performClick();assertDelete();
+ }
+ @Test public void builtInRowsKeepTapAndHoldAndDoNotOfferAndroidUninstall(){
+  store.startPins(Collections.singletonList("@notes"));menu.show(false);ListView list=ReflectionHelpers.getField(menu,"list");View row=list.getAdapter().getView(0,null,list);root.addView(row,new FrameLayout.LayoutParams(300,48));row.layout(0,0,300,48);
+  assertTrue(row.performClick());assertEquals("@notes",opened);opened=null;assertTrue(row.performLongClick());assertNull(opened);PopupWindow popup=shadowOf(RuntimeEnvironment.getApplication()).getLatestPopupWindow();assertNotNull(find(popup.getContentView(),"Open"));assertNull(find(popup.getContentView(),"Uninstall"));popup.dismiss();
+ }
 
 }

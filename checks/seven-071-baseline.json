@@ -180,8 +180,8 @@
       "reason": "Add a distinct native Android uninstall action for eligible installed apps."
     },
     "app/src/main/java/com/nthexperience/desktop/StartMenu.java": {
-      "sha256": "7bf10188f3fb43d3423ab6fa5268168b4d087883b54ec8787047af5513e68e7e",
-      "reason": "Preserve Start styling while exposing direct uninstall/context-click app actions."
+      "sha256": "687bb58a1ddb64ede44522321ceb705968af91028a510e0beee7feeb8f547f99",
+      "reason": "Bind normal activation and touch-hold options to the same Seven program row as mouse context clicks, keeping its artwork/layout and parent scrolling."
     },
     "app/src/main/java/com/nthexperience/desktop/WeatherLocation.java": {
       "sha256": "892ec0c206e9e1a6d730519b103da06809972b28e7c32fce9a22367491c7c4a5",
