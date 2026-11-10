@@ -34,7 +34,7 @@ public class InitializationFlowTest {
     private final Set<Step> granted=EnumSet.noneOf(Step.class);
     private class TestHost implements InitializationFlow.Host {boolean ready=true;int changes,wakes;public boolean ready(){return ready;}public boolean home(){return granted.contains(Step.HOME);}public boolean requestHome(){return true;}public void changed(){changes++;}public void wake(){wakes++;}}
     private class TestFlow extends InitializationFlow {TestFlow(){super(activity,store,host,Runnable::run);}@Override boolean granted(Step step){return granted.contains(step);}}
-    @Before public void setup(){controller=Robolectric.buildActivity(Activity.class).setup();activity=controller.get();store=new DesktopStore(activity);store.prefs.edit().clear().commit();activity.getSharedPreferences(InitializationState.PREFS,0).edit().clear().commit();host=new TestHost();flow=new TestFlow();flow.resumed();}
+    @Before public void setup(){controller=Robolectric.buildActivity(Activity.class).setup();activity=controller.get();store=new DesktopStore(activity);store.prefs.edit().clear().commit();activity.getSharedPreferences(InitializationState.PREFS,0).edit().clear().commit();activity.getSharedPreferences(StartupExperience.SESSION,0).edit().clear().commit();activity.getSharedPreferences(StorageAccess.PREFS,0).edit().clear().commit();host=new TestHost();flow=new TestFlow();flow.resumed();}
     @After public void close(){flow.close();controller.pause().stop().destroy();}
     private AlertDialog dialog(){AlertDialog dialog=ShadowAlertDialog.getLatestAlertDialog();assertNotNull(dialog);assertTrue(dialog.isShowing());return dialog;}
     private void assertTitle(String title){assertTrue("Dialog contains title: "+title,contains(dialog().getWindow().getDecorView(),title));}
@@ -43,25 +43,55 @@ public class InitializationFlowTest {
     private void enable(){dialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick();shadowOf(Looper.getMainLooper()).idle();}
     private void finishEmptyFolderCheck(){flow.pending();shadowOf(Looper.getMainLooper()).idle();flow.pending();assertFalse(flow.pending());}
     @Test public void allSevenStepsUseRequestedOrderAndDeclinesContinue(){
-        String[] titles={"Default Launcher","Enable File Browsing","Enable Usage Access","Allow Notifications Access","Modify System Settings (Brightness)","Allow Location"};
+        String[] titles={"Default Launcher","Set up Nth Explorer","Set up Usage Access","Allow Notifications Access","Modify System Settings (Brightness)","Allow Location"};
         for(int i=0;i<titles.length;i++){assertTrue(flow.pending());assertEquals(Step.values()[i],flow.state.step());assertTitle(titles[i]);later();}
         assertEquals(Step.FOLDERS,flow.state.step());finishEmptyFolderCheck();assertEquals(Step.DONE,flow.state.step());assertFalse(flow.pending());
     }
     @Test public void existingGrantsAreSkippedAndCompletionIsDeviceLocal()throws Exception{
         granted.addAll(Arrays.asList(Step.HOME,Step.FILES,Step.USAGE,Step.NOTIFICATIONS,Step.BRIGHTNESS,Step.LOCATION));finishEmptyFolderCheck();assertEquals(Step.DONE,new InitializationState(activity).step());assertFalse(DesktopBackup.snapshot(store).toString().contains(InitializationState.PREFS));assertFalse(store.prefs.contains("step"));
     }
-    @Test public void settingsReturnWaitsForFocusAndThenOffersNotifications(){
+    @Test public void grantedUsageReturnWaitsForFocusAndThenOffersNotifications(){
         granted.addAll(Arrays.asList(Step.HOME,Step.FILES));assertTrue(flow.pending());assertEquals(Step.USAGE,flow.state.step());enable();assertEquals(InitializationFlow.USAGE,flow.state.waiting());Intent launched=shadowOf(activity).getNextStartedActivityForResult().intent;assertEquals(Settings.ACTION_USAGE_ACCESS_SETTINGS,launched.getAction());
-        flow.result(InitializationFlow.USAGE,Activity.RESULT_CANCELED,null);assertTrue(flow.pending());assertEquals(Step.USAGE,flow.state.step());flow.paused();host.ready=false;flow.resumed();flow.pending();assertEquals(Step.USAGE,flow.state.step());host.ready=true;flow.pending();assertEquals(Step.NOTIFICATIONS,flow.state.step());assertTitle("Allow Notifications Access");enable();assertEquals(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS,shadowOf(activity).getNextStartedActivityForResult().intent.getAction());
+        flow.result(InitializationFlow.USAGE,Activity.RESULT_CANCELED,null);assertTrue(flow.pending());assertEquals(Step.USAGE,flow.state.step());flow.paused();granted.add(Step.USAGE);host.ready=false;flow.resumed();flow.pending();assertEquals(Step.USAGE,flow.state.step());host.ready=true;flow.pending();assertEquals(Step.NOTIFICATIONS,flow.state.step());assertTitle("Allow Notifications Access");enable();assertEquals(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS,shadowOf(activity).getNextStartedActivityForResult().intent.getAction());
+    }
+    @Test public void deniedUsageReturnReopensGuideForAppInfoThenLaterContinues(){
+        flow.state.prefs.edit().putInt("step",Step.USAGE.ordinal()).commit();flow.pending();enable();assertEquals(Settings.ACTION_USAGE_ACCESS_SETTINGS,shadowOf(activity).getNextStartedActivityForResult().intent.getAction());
+        flow.paused();flow.result(InitializationFlow.USAGE,Activity.RESULT_CANCELED,null);flow.resumed();flow.pending();assertEquals(Step.USAGE,flow.state.step());assertEquals(0,flow.state.waiting());assertTitle("Set up Usage Access");assertNull(shadowOf(activity).getNextStartedActivityForResult());
+        dialog().getButton(AlertDialog.BUTTON_NEUTRAL).performClick();shadowOf(Looper.getMainLooper()).idle();assertEquals(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,shadowOf(activity).getNextStartedActivityForResult().intent.getAction());
+        flow.paused();flow.result(InitializationFlow.USAGE_INFO,Activity.RESULT_CANCELED,null);flow.resumed();flow.pending();assertEquals(Step.USAGE,flow.state.step());assertTitle("Set up Usage Access");
+        later();flow.pending();assertEquals(Step.NOTIFICATIONS,flow.state.step());assertTitle("Allow Notifications Access");
+    }
+    @Test public void usageReturnChecksActualGrantInsteadOfSettingsResult(){
+        flow.state.prefs.edit().putInt("step",Step.USAGE.ordinal()).commit();
+        for(int attempt=0;attempt<2;attempt++){
+            flow.pending();enable();shadowOf(activity).getNextStartedActivityForResult();flow.paused();flow.result(InitializationFlow.USAGE,Activity.RESULT_OK,null);flow.resumed();flow.pending();assertEquals(Step.USAGE,flow.state.step());assertTitle("Set up Usage Access");assertNull(shadowOf(activity).getNextStartedActivityForResult());
+        }
+    }
+    @Test public void usageGuideKeepsTheIllustrationAndAppInfoReturnsToTheSameStep(){
+        flow.state.prefs.edit().putInt("step",Step.USAGE.ordinal()).commit();flow.pending();assertTitle("Set up Usage Access");
+        assertTrue(contains(dialog().getWindow().getDecorView(),"Allow restricted settings"));assertEquals("OK",dialog().getButton(AlertDialog.BUTTON_POSITIVE).getText().toString());
+        dialog().getButton(AlertDialog.BUTTON_NEUTRAL).performClick();shadowOf(Looper.getMainLooper()).idle();
+        org.robolectric.shadows.ShadowActivity.IntentForResult request=shadowOf(activity).getNextStartedActivityForResult();assertEquals(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,request.intent.getAction());assertEquals("package:"+activity.getPackageName(),request.intent.getDataString());assertEquals(InitializationFlow.USAGE_INFO,request.requestCode);
+        flow.paused();flow.result(InitializationFlow.USAGE_INFO,Activity.RESULT_CANCELED,null);flow.resumed();flow.pending();assertEquals(Step.USAGE,flow.state.step());assertTitle("Set up Usage Access");
+        later();assertEquals(Step.NOTIFICATIONS,flow.state.step());
+    }
+    @Test public void appInfoGuidanceSurvivesRecreationWithoutSkippingUsage(){
+        flow.state.prefs.edit().putInt("step",Step.USAGE.ordinal()).commit();flow.pending();dialog().getButton(AlertDialog.BUTTON_NEUTRAL).performClick();flow.paused();flow.close();flow=new TestFlow();flow.resumed();flow.pending();assertEquals(Step.USAGE,flow.state.step());assertTitle("Set up Usage Access");
     }
     @Test public void brightnessUsesAppSpecificSystemSettings(){
         granted.addAll(Arrays.asList(Step.HOME,Step.FILES,Step.USAGE,Step.NOTIFICATIONS));flow.pending();enable();Intent launched=shadowOf(activity).getNextStartedActivityForResult().intent;assertEquals(Settings.ACTION_MANAGE_WRITE_SETTINGS,launched.getAction());assertEquals("package:"+activity.getPackageName(),launched.getDataString());assertEquals(InitializationFlow.BRIGHTNESS,flow.state.waiting());
     }
     @Test public void closingForRecreationKeepsCurrentStep(){
-        flow.pending();later();flow.pending();assertEquals(Step.FILES,flow.state.step());flow.close();flow=new TestFlow();flow.resumed();flow.pending();assertEquals(Step.FILES,flow.state.step());assertTitle("Enable File Browsing");
+        flow.pending();later();flow.pending();assertEquals(Step.FILES,flow.state.step());flow.close();flow=new TestFlow();flow.resumed();flow.pending();assertEquals(Step.FILES,flow.state.step());assertTitle("Set up Nth Explorer");
     }
-    @Test public void pendingSettingsSurviveRecreation(){
-        granted.addAll(Arrays.asList(Step.HOME,Step.FILES));flow.pending();enable();flow.paused();flow.close();flow=new TestFlow();flow.resumed();flow.pending();assertEquals(Step.NOTIFICATIONS,flow.state.step());assertTitle("Allow Notifications Access");
+    @Test public void deniedUsageReturnSurvivesRecreationWithoutSkipping(){
+        granted.addAll(Arrays.asList(Step.HOME,Step.FILES));flow.pending();enable();flow.paused();flow.close();flow=new TestFlow();flow.resumed();flow.pending();assertEquals(Step.USAGE,flow.state.step());assertTitle("Set up Usage Access");later();assertEquals(Step.NOTIFICATIONS,flow.state.step());
+    }
+    @Test public void grantedUsageReturnSurvivesRecreation(){
+        granted.addAll(Arrays.asList(Step.HOME,Step.FILES));flow.pending();enable();flow.paused();granted.add(Step.USAGE);flow.close();flow=new TestFlow();flow.resumed();flow.pending();assertEquals(Step.NOTIFICATIONS,flow.state.step());assertTitle("Allow Notifications Access");
+    }
+    @Test public void otherSettingsReturnsStillAdvanceWhenAccessIsDeclined(){
+        flow.state.prefs.edit().putInt("step",Step.NOTIFICATIONS.ordinal()).commit();flow.pending();enable();flow.paused();flow.result(InitializationFlow.NOTIFICATIONS,Activity.RESULT_CANCELED,null);flow.resumed();flow.pending();assertEquals(Step.BRIGHTNESS,flow.state.step());assertTitle("Modify System Settings (Brightness)");
     }
     @Test public void restoredBackupQueuesOnlyFolderRepairAndClearsDeferrals(){
         for(int i=0;i<Step.DONE.ordinal();i++)flow.state.advance();flow.state.defer("old");InitializationState.restored(activity);assertEquals(Step.FOLDERS,flow.state.step());assertTrue(flow.state.deferred().isEmpty());flow.state.prefs.edit().putInt("step",Step.USAGE.ordinal()).commit();InitializationState.restored(activity);assertEquals(Step.USAGE,flow.state.step());
@@ -91,6 +121,20 @@ public class InitializationFlowTest {
 
     @Test public void locationRequestsBothPermissionsForAndroidAccuracyChoice(){
         flow.state.prefs.edit().putInt("step",Step.LOCATION.ordinal()).commit();store.prefs.edit().putString("weather_city","Saved city").commit();flow.pending();assertTitle("Allow Location");enable();org.robolectric.shadows.ShadowActivity.PermissionsRequest request=shadowOf(activity).getLastRequestedPermission();assertEquals(InitializationFlow.LOCATION,request.requestCode);assertArrayEquals(new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION,android.Manifest.permission.ACCESS_COARSE_LOCATION},request.requestedPermissions);flow.permissionResult(InitializationFlow.LOCATION);flow.paused();flow.resumed();flow.pending();assertEquals(Step.FOLDERS,flow.state.step());assertEquals("Saved city",store.prefs.getString("weather_city",""));
+    }
+    @Test public void originalReleaseSetupDoesNotRepeatEarlierSteps(){
+        flow.state.prefs.edit().clear().commit();
+        activity.getSharedPreferences(StartupExperience.SESSION,0).edit().putBoolean("welcome_seen",true).commit();
+        activity.getSharedPreferences(StorageAccess.PREFS,0).edit().putBoolean("seen",true).commit();
+        InitializationState migrated=new InitializationState(activity);
+        assertEquals(Step.LOCATION,migrated.step());
+        migrated.advance();migrated.advance();
+        assertEquals(Step.DONE,new InitializationState(activity).step());
+    }
+    @Test public void unfinishedOriginalReleaseStillStartsWithHome(){
+        flow.state.prefs.edit().clear().commit();
+        activity.getSharedPreferences(StartupExperience.SESSION,0).edit().clear().commit();
+        assertEquals(Step.HOME,new InitializationState(activity).step());
     }
     @Test public void oldCompletedSetupOffersLocationOnce(){
         flow.state.prefs.edit().putInt("flow_version",1).putInt("step",6).commit();InitializationState migrated=new InitializationState(activity);assertEquals(Step.LOCATION,migrated.step());migrated.advance();assertEquals(Step.FOLDERS,new InitializationState(activity).step());

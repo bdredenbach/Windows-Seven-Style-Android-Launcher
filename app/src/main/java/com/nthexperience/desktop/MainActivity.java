@@ -136,6 +136,7 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
             public void changed(){refreshUsageAccess();filesChanged();if(brightness!=null)brightness.apply();}
             public void wake(){if(startup!=null)root.post(startup::maybeShow);}
         },worker,saved!=null);
+        if(saved!=null&&saved.getBoolean("usage_guide_open",false))root.post(()->{if(!ExternalTasks.permitted(this))showTaskbarUsageGuide(UsageGuide.RETURN);});
     }
     private void buildDesktop(){
         root=new FrameLayout(this);wallpaper=new AeroWallpaper(this,store.prefs.getInt("wallpaper",AeroWallpaper.SEVEN));root.addView(wallpaper,new FrameLayout.LayoutParams(-1,-1));
@@ -1229,19 +1230,12 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
         Aero.pad(content,16);
         content.addView(Aero.text(this,message,14,Aero.INK));
         if(showAppInfo){
-            String steps="In App info, tap the three dots (⋮) and choose Allow restricted settings if shown. "
-                    +"Then press Back to return to the Usage Access switch.";
-            if(!returning)steps="If Android says ‘App was denied access’, tap Close, then press Back to "+appName+". "
-                    +"This guide will reopen. Tap Open App info below. "+steps;
+            String steps="If Android says ‘App was denied access’, tap Close, then press Back to return to this guide. Tap Open App info below, open the three-dot menu (⋮), and choose Allow restricted settings if shown. Then press Back to return here and tap OK to try Usage Access again.";
             TextView recovery=Aero.text(this,steps,14,Aero.INK);
             recovery.setPadding(0,dp(12),0,dp(10));
             content.addView(recovery);
 
-            ImageView example=new ImageView(this);
-            example.setAdjustViewBounds(true);
-            example.setImageResource(R.drawable.usage_access_app_info);
-            example.setContentDescription("Android App info menu showing Allow restricted settings");
-            content.addView(example,new LinearLayout.LayoutParams(-1,-2));
+            content.addView(new UsageAccessExample(this),new LinearLayout.LayoutParams(-1,-2));
         }
 
         ScrollView scroll=new ScrollView(this);
@@ -1255,7 +1249,7 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
             usageGuide=null;
             if(!destroyed)refreshUsageAccess();
         });
-        usageGuide.show();
+        usageGuide.show();Aero.styleDialog(this,usageGuide);InitializationFlow.fitDialog(this,usageGuide);
     }
 
     private void requestTaskbarUsage(){
@@ -1302,8 +1296,7 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
         int request=usageSettingsRequest;
         usageSettingsRequest=0;
         usageSettingsLeft=false;
-        if(request==REQUEST_USAGE_APP_INFO)requestTaskbarUsage();
-        else if(request==REQUEST_USAGE_ACCESS&&!ExternalTasks.permitted(this))showTaskbarUsageGuide(UsageGuide.RETURN);
+        if((request==REQUEST_USAGE_APP_INFO||request==REQUEST_USAGE_ACCESS)&&!ExternalTasks.permitted(this))showTaskbarUsageGuide(UsageGuide.RETURN);
     }
 
     private void setTaskbarUsage(boolean enabled){
@@ -1668,9 +1661,9 @@ public final class MainActivity extends Activity implements StartMenu.Actions,Ga
     @Override public void onConfigurationChanged(android.content.res.Configuration config){
         super.onConfigurationChanged(config);if(previews!=null)previews.dismiss();String next=config.orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE?"landscape":"portrait";
         if(!next.equals(layoutKey)){arrangementUndo.clear();for(DesktopWindow tool:windows.values())if(tool.getParent()!=null){tool.dismissSystemMenu();tool.settle();tool.orientation(next);}layoutKey=next;desktop.orientation(next);sidebar.orientation(next);}
-        if(startup!=null){startup.pause();startup.resume();}if(desktopMenu!=null)desktopMenu.dismiss();if(tray!=null)tray.dismiss();pausedSession=null;applySystemChrome();workspace.post(()->{layoutWorkspace();renderTaskbar();});
+        if(startup!=null){startup.pause();startup.resume();}if(desktopMenu!=null)desktopMenu.dismiss();if(tray!=null)tray.dismiss();pausedSession=null;applySystemChrome();workspace.post(()->{layoutWorkspace();renderTaskbar();InitializationFlow.fitDialog(this,usageGuide);});
     }
-    @Override protected void onSaveInstanceState(Bundle state){super.onSaveInstanceState(state);state.putBoolean("storage_setup_open",storageSetup!=null&&storageSetup.showing());state.putBoolean("home_request_in_flight",homeRequestInFlight);state.putInt("usage_settings_request",usageSettingsRequest);state.putBoolean("usage_settings_left",usageSettingsLeft);state.putString("pending_theme_export",pendingThemeExport);state.putString("folder_window",pendingFolderWindow);if(!restoringBackup)state.putString("desktop_session",(pausedSession==null?captureSession():pausedSession).toString());}
+    @Override protected void onSaveInstanceState(Bundle state){super.onSaveInstanceState(state);state.putBoolean("storage_setup_open",storageSetup!=null&&storageSetup.showing());state.putBoolean("home_request_in_flight",homeRequestInFlight);state.putInt("usage_settings_request",usageSettingsRequest);state.putBoolean("usage_settings_left",usageSettingsLeft);state.putBoolean("usage_guide_open",usageGuide!=null&&usageGuide.isShowing());state.putString("pending_theme_export",pendingThemeExport);state.putString("folder_window",pendingFolderWindow);if(!restoringBackup)state.putString("desktop_session",(pausedSession==null?captureSession():pausedSession).toString());}
     private JSONObject captureSession(){
         JSONObject session=new JSONObject();JSONArray tools=new JSONArray();
         if(workspace==null)return session;

@@ -20,7 +20,7 @@ public final class SevenSetupSmoke extends Instrumentation {
         context.getSharedPreferences(StartupExperience.SESSION,0).edit().clear().commit();
         context.getSharedPreferences(InitializationState.PREFS,0).edit().clear().commit();
         launch();int previous=-1,prompts=0;
-        String[] titles={"Default Launcher","Enable File Browsing","Enable Usage Access","Allow Notifications Access","Modify System Settings (Brightness)","Allow Location"};
+        String[] titles={"Default Launcher","Set up Nth Explorer","Set up Usage Access","Allow Notifications Access","Modify System Settings (Brightness)","Allow Location"};
         while(flow.state.step()!=InitializationState.Step.DONE){
             await(()->flow.state.step()==InitializationState.Step.DONE||dialog()!=null,"Setup advances or shows its next dialog");
             if(flow.state.step()==InitializationState.Step.DONE)break;

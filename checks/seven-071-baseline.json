@@ -168,8 +168,8 @@
       "reason": "Include the newly authorized phone notification access in the existing Seven Action Center."
     },
     "app/src/main/java/com/nthexperience/desktop/StartupExperience.java": {
-      "sha256": "9478d4ec283a84954b336fdf6b0fe2ac3494684b3eca2726d3e0ed35da0b3286",
-      "reason": "Run the six requested initialization steps before the existing Welcome/start surface."
+      "sha256": "8e6c1e24a260d9bcaa735beb8b9e9fcc6f9bfb9512420af126a00f229a47a670",
+      "reason": "Keep Seven Welcome Center behind ordered optional setup guides, preserving the existing Seven introduction and startup policy."
     },
     "app/src/main/java/com/nthexperience/desktop/SystemTray.java": {
       "sha256": "a0ef059ca716e7627417962686f3f5a7edf8735283cfc0c3a8b606f33d98e709",

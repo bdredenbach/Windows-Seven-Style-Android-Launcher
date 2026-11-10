@@ -13,6 +13,11 @@ public class InitializationUpgradeTest {
     private Context context;
     @Before public void reset(){context=RuntimeEnvironment.getApplication();context.getSharedPreferences(InitializationState.PREFS,0).edit().clear().commit();context.getSharedPreferences(StartupExperience.SESSION,0).edit().clear().commit();}
     @Test public void freshInstallStartsWithHome(){assertEquals(InitializationState.Step.HOME,new InitializationState(context).step());}
+    @Test public void newWelcomeBackdropDoesNotMarkAnUnfinishedFlowAsLegacyCompleted(){
+        InitializationState original=new InitializationState(context);assertEquals(InitializationState.Step.HOME,original.step());
+        context.getSharedPreferences(StartupExperience.SESSION,0).edit().putBoolean("welcome_seen",true).commit();
+        assertEquals(InitializationState.Step.HOME,new InitializationState(context).step());
+    }
     @Test public void completedLegacyInstallOnlyOffersNewLocationOnce(){
         context.getSharedPreferences(StartupExperience.SESSION,0).edit().putBoolean("welcome_seen",true).commit();
         InitializationState state=new InitializationState(context);assertEquals(InitializationState.Step.LOCATION,state.step());

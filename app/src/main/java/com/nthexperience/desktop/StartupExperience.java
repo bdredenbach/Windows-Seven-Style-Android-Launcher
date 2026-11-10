@@ -53,13 +53,15 @@ final class StartupExperience {
     }
     private void watchEarlyBoot(){if(resumed&&store.prefs.getInt("startup_mode",0)==1&&SystemClock.uptimeMillis()<bootWatchDeadline)host.postDelayed(reconsider,1000);}
     private void finishSetup(){
-        if(!resumed||!activity.hasWindowFocus()||activity.initializationPending())return;
+        if(!resumed||!activity.hasWindowFocus())return;
         if(!welcomeChecked){
             welcomeChecked=true;
             boolean firstWelcome=!session.getBoolean("welcome_seen",false);
             if(firstWelcome)session.edit().putBoolean("welcome_seen",true).apply();
             if(firstWelcome||welcomeAtStart)welcome.run();
         }
+        // Keep the familiar Seven Welcome Center behind the optional setup guides.
+        if(activity.initializationPending())return;
         activity.startupSetupReady();
     }
     boolean takeUsageSetupOffer(){
