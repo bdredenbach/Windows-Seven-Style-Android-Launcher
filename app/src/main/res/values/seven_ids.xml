@@ -2,4 +2,6 @@
     <item name="taskbar_order_key" type="id" />
     <item name="taskbar_move_left" type="id" />
     <item name="taskbar_move_right" type="id" />
+    <item name="taskbar_move_top" type="id"/>
+    <item name="taskbar_move_bottom" type="id"/>
 </resources>

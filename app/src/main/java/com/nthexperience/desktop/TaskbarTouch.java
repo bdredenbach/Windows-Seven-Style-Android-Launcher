@@ -27,6 +27,9 @@ final class TaskbarTouch {
                 float density=button.getResources().getDisplayMetrics().density;
                 float dx=(event.getRawX()-x)/density,dy=(event.getRawY()-y)/density;
                 long elapsed=event.getEventTime()-event.getDownTime();
+                if(action==MotionEvent.ACTION_MOVE&&!scrolling&&!swiped&&reorder.expanded()&&elapsed>=160&&(Math.abs(dx)>=12||Math.abs(dy)>=12)){
+                    button.cancelLongPress();if(reorder.begin(button)){tracking=false;cancelButton(button,event);return true;}
+                }
                 if(!scrolling&&!swiped&&jump!=null&&TaskbarFlick.opensJumpList(dx,dy,elapsed)){
                     swiped=true;cancelButton(button,event);
                 }
@@ -50,9 +53,11 @@ final class TaskbarTouch {
         });
         view.setOnKeyListener((button,key,event)->{
             if(event.getAction()!=KeyEvent.ACTION_DOWN)return false;
-            if(key==KeyEvent.KEYCODE_MENU){button.performContextClick();return true;}
+            if((key==KeyEvent.KEYCODE_MENU||(key==KeyEvent.KEYCODE_F10&&event.isShiftPressed()))){button.performContextClick();return true;}
             if(event.isCtrlPressed()&&event.isShiftPressed()&&(key==KeyEvent.KEYCODE_DPAD_LEFT||key==KeyEvent.KEYCODE_DPAD_RIGHT))
                 return reorder.move(TaskbarReorder.key(button),key==KeyEvent.KEYCODE_DPAD_LEFT?-1:1);
+            if(event.isCtrlPressed()&&event.isShiftPressed()&&(key==KeyEvent.KEYCODE_DPAD_UP||key==KeyEvent.KEYCODE_DPAD_DOWN))
+                return reorder.moveRow(TaskbarReorder.key(button),key==KeyEvent.KEYCODE_DPAD_UP?0:1);
             return false;
         });
         view.setAccessibilityDelegate(new View.AccessibilityDelegate(){
@@ -60,10 +65,15 @@ final class TaskbarTouch {
                 super.onInitializeAccessibilityNodeInfo(host,info);
                 info.addAction(new AccessibilityNodeInfo.AccessibilityAction(R.id.taskbar_move_left,"Move left on taskbar"));
                 info.addAction(new AccessibilityNodeInfo.AccessibilityAction(R.id.taskbar_move_right,"Move right on taskbar"));
+                if(reorder.expanded()){
+                    info.addAction(new AccessibilityNodeInfo.AccessibilityAction(R.id.taskbar_move_top,"Move to top taskbar row"));
+                    info.addAction(new AccessibilityNodeInfo.AccessibilityAction(R.id.taskbar_move_bottom,"Move to bottom taskbar row"));
+                }
             }
             @Override public boolean performAccessibilityAction(View host,int action,android.os.Bundle args){
                 if(action==R.id.taskbar_move_left||action==R.id.taskbar_move_right)
                     return reorder.move(TaskbarReorder.key(host),action==R.id.taskbar_move_left?-1:1);
+                if(action==R.id.taskbar_move_top||action==R.id.taskbar_move_bottom)return reorder.moveRow(TaskbarReorder.key(host),action==R.id.taskbar_move_top?0:1);
                 return super.performAccessibilityAction(host,action,args);
             }
         });

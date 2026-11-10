@@ -29,4 +29,5 @@
     <instrumentation android:name="com.nthexperience.desktop.SevenSetupSmoke" android:targetPackage="${launcherApplicationId}" android:functionalTest="true" />
     <instrumentation android:name="com.nthexperience.desktop.SevenUsageAccessSmoke" android:targetPackage="${launcherApplicationId}" android:functionalTest="true" />
     <instrumentation android:name="com.nthexperience.desktop.SevenStartMenuTouchSmoke" android:targetPackage="${launcherApplicationId}" android:functionalTest="true" />
+    <instrumentation android:name="com.nthexperience.desktop.SevenIndependentRowsSmoke" android:targetPackage="${launcherApplicationId}" android:functionalTest="true" />
 </manifest>
