@@ -43,12 +43,13 @@ jobs:
           api-level: ${{ matrix.api }}
           emulator-build: 15917651
           arch: x86_64
-          target: ${{ matrix.api == 30 && 'default' || 'google_apis' }}
+          target: ${{ matrix.api == 30 && 'default' || 'aosp_atd' }}
           profile: pixel_2
           ram-size: 2048M
           heap-size: 384M
           emulator-options: -no-window -gpu swiftshader -feature -Vulkan -no-snapshot -noaudio -no-boot-anim
           disable-animations: true
+          emulator-boot-timeout: 300
           script: bash checks/run-seven-taskbar-rows.sh
       - uses: actions/upload-artifact@v4
         if: always()
