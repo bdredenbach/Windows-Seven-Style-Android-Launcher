@@ -41,7 +41,7 @@ public class TaskbarRowsTest {
     @Test public void rejectsBadTypesRangesIdsAndJsonBeforeMutation()throws Exception{
         store.prefs.edit().putString("note","keep").commit();
         for(String raw:new String[]{"[]","{","{\"@notes\":true}","{\"@notes\":\"0\"}","{\"@notes\":0.5}","{\"@notes\":2}","{\"@notes\":-1}","{\"\":0}","{\"bad\\nkey\":0}"}){
-            JSONObject backup=DesktopBackup.snapshot(store);backup.getJSONObject("settings").put("note","changed").put(TaskbarRows.KEY,raw);try{DesktopBackup.parse(backup.toString());fail(raw);}catch(JSONException expected){}assertEquals("keep",store.prefs.getString("note",""));
+            JSONObject backup=DesktopBackup.snapshot(store);backup.getJSONObject("settings").put("note",new JSONObject().put("type","string").put("value","changed")).put(TaskbarRows.KEY,new JSONObject().put("type","string").put("value",raw));try{DesktopBackup.parse(backup.toString());fail(raw);}catch(JSONException expected){}assertEquals("keep",store.prefs.getString("note",""));
         }
     }
     @Test public void rejectsOversizedMapAndBoundsSavedHistory()throws Exception{

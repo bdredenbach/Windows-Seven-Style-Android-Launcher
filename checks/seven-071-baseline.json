@@ -198,6 +198,10 @@
     "app/src/main/java/com/nthexperience/desktop/TaskbarTouch.java": {
       "sha256": "af15ca599251486847ac23b10114711eb3c781694406db8cc561f1568e004263",
       "reason": "Deliberate cross-row dragging and accessible/keyboard row moves while preserving swipes, holds and jump lists."
+    },
+    "app/src/main/res/values/seven_ids.xml": {
+      "sha256": "4d6e120a73472802a2792575488c905cd81ec207c11de6a4720234488054e77f",
+      "reason": "Add accessible move-to-top and move-to-bottom taskbar row action IDs."
     }
   },
   "approved_shell_changes": {
@@ -210,7 +214,7 @@
       "reason": "Requested independent taskbar rows with full upper viewport, fixed bottom controls, explicit row choices and per-row static fitting; Seven menus and artwork retained."
     },
     "buildTaskbar": {
-      "sha256": "0e0ddbe0eb3753d99f2130caa31fb431fe32c29a761d710afc1d566394627285",
+      "sha256": "aa37f9ce9e3c23230979637b2abf6418187c34c7af42727299cfb74617929b4b",
       "reason": "Requested independent taskbar rows with full upper viewport, fixed bottom controls, explicit row choices and per-row static fitting; Seven menus and artwork retained."
     }
   }
