@@ -4,7 +4,7 @@ launcher=com.nthexperience.desktop.seven
 collect() {
  mkdir -p screenshots
  for name in $(adb shell run-as "$launcher" ls files 2>/dev/null | tr -d '\r'); do
-  case "$name" in seven-rows-*.png|seven-independent-rows-*.png) adb exec-out run-as "$launcher" cat "files/$name" > "screenshots/$name" 2>/dev/null || true;; esac
+  case "$name" in seven-rows-*.png|seven-independent-rows-*.png|start-touch-*.png|seven-usage-*.png|seven-polish-*.png|seven-setup-*.png) adb exec-out run-as "$launcher" cat "files/$name" > "screenshots/$name" 2>/dev/null || true;; esac
  done
  adb logcat -d -t 500 > screenshots/rows-device-log.txt || true
 }
@@ -15,6 +15,7 @@ adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 adb shell input keyevent KEYCODE_WAKEUP
 adb shell wm dismiss-keyguard
 for runner in SevenIndependentRowsSmoke SevenTaskbarRowsSmoke SevenStartMenuTouchSmoke SevenUsageAccessSmoke SevenSetupSmoke SevenPolishSmoke SnapSmoke FidelitySmoke; do
+ adb shell wm size reset
  adb shell am force-stop "$launcher"
  adb shell pm clear "$launcher"
  if [[ "$runner" == FidelitySmoke ]]; then adb shell appops set --uid "$launcher" MANAGE_EXTERNAL_STORAGE allow; fi

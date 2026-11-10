@@ -28,6 +28,7 @@ jobs:
       - run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :fixture:assembleDebug --no-daemon
+      - run: python3 checks/CheckSevenBaseline.py --version-name 0.7.5 --version-code 28
       - name: Preserve APK signing tool
         run: |
           mkdir -p build/signing-tool
@@ -40,8 +41,9 @@ jobs:
       - uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api }}
+          emulator-build: 15917651
           arch: x86_64
-          target: ${{ matrix.api == 30 && 'default' || 'aosp_atd' }}
+          target: ${{ matrix.api == 30 && 'default' || 'google_apis' }}
           profile: pixel_2
           ram-size: 2048M
           heap-size: 384M

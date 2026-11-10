@@ -192,7 +192,7 @@
       "reason": "Independent row viewports, saved row assignment, clipping/focus, touch-refresh guard and row-local scrolling."
     },
     "app/src/main/java/com/nthexperience/desktop/TaskbarReorder.java": {
-      "sha256": "02cc77f920b8e67e2056bcf91bef8475d787a3aa628978d52edfd6b37f6b221b",
+      "sha256": "5ffffc03028db03abf3c37a8d9b308db1400ce1816978919101f67575fd21036",
       "reason": "Cross-row drops with remembered choices; row-local insertion and edge scrolling; cancel safety."
     },
     "app/src/main/java/com/nthexperience/desktop/TaskbarTouch.java": {
@@ -202,6 +202,10 @@
     "app/src/main/res/values/seven_ids.xml": {
       "sha256": "4d6e120a73472802a2792575488c905cd81ec207c11de6a4720234488054e77f",
       "reason": "Add accessible move-to-top and move-to-bottom taskbar row action IDs."
+    },
+    "app/src/main/java/com/nthexperience/desktop/VistaControlPanel.java": {
+      "sha256": "d5869766cfc67ff674dbd384d343a2d897fe9b463b6b4475acaabe43bb833550",
+      "reason": "Explain cross-row app dragging and independent row swipes in the existing taskbar help."
     }
   },
   "approved_shell_changes": {

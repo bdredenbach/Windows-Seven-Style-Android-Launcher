@@ -20,10 +20,11 @@ final class TaskbarReorder {
     private final Handler main=new Handler(Looper.getMainLooper());
     private final GradientDrawable marker=new GradientDrawable();
     private Move active;
-    private boolean closed,markerAdded;
+    private boolean closed,markerAdded,hovering;
     private float rawX,rawY;
     private final Runnable autoscroll=new Runnable(){public void run(){
         if(active==null||closed)return;
+        if(!hovering){main.postDelayed(this,16);return;}
         int edge=Aero.dp(items.getContext(),28),step=Aero.dp(items.getContext(),6);
         if(expanded()){
             TaskbarItems rows=(TaskbarItems)items;int[] at=new int[2];items.getLocationOnScreen(at);float x=rawX-at[0],y=rawY-at[1];int row=rows.rowAt(y);
@@ -58,7 +59,7 @@ final class TaskbarReorder {
         Move move=new Move(this,button,id);active=move;int[] start=new int[2];button.getLocationOnScreen(start);rawX=start[0]+button.getWidth()/2f;rawY=start[1]+button.getHeight()/2f;
         boolean started=button.startDragAndDrop(ClipData.newPlainText("taskbar-order",id),new View.DragShadowBuilder(button),move,0);
         if(!started){active=null;return false;}
-        button.setAlpha(.4f);main.post(autoscroll);return true;
+        hovering=true;button.setAlpha(.4f);main.post(autoscroll);return true;
     }
     boolean expanded(){return items instanceof TaskbarItems&&((TaskbarItems)items).expanded;}
     private View button(String id){for(int i=0;i<items.getChildCount();i++)if(id.equals(key(items.getChildAt(i))))return items.getChildAt(i);return null;}
@@ -86,8 +87,8 @@ final class TaskbarReorder {
             case DragEvent.ACTION_DRAG_STARTED:return !closed;
             case DragEvent.ACTION_DRAG_LOCATION:
             case DragEvent.ACTION_DRAG_ENTERED:
-                int[] at=new int[2];items.getLocationOnScreen(at);rawX=at[0]+event.getX();rawY=at[1]+event.getY();updateMarker();return true;
-            case DragEvent.ACTION_DRAG_EXITED:removeMarker();return true;
+                hovering=true;int[] at=new int[2];items.getLocationOnScreen(at);rawX=at[0]+event.getX();rawY=at[1]+event.getY();updateMarker();return true;
+            case DragEvent.ACTION_DRAG_EXITED:hovering=false;removeMarker();return true;
             case DragEvent.ACTION_DROP:
                 if(expanded()){
                     TaskbarItems rows=(TaskbarItems)items;int row=rows.rowAt(event.getY());
@@ -133,7 +134,7 @@ final class TaskbarReorder {
     private void removeMarker(){if(markerAdded){items.getOverlay().remove(marker);markerAdded=false;}}
     private void finish(Move move,boolean accepted){
         if(move.ended)return;move.ended=true;move.source.setAlpha(1);
-        main.removeCallbacks(autoscroll);removeMarker();if(active==move)active=null;
+        hovering=false;main.removeCallbacks(autoscroll);removeMarker();if(active==move)active=null;
         List<String> order=accepted?move.order:null;
         if(accepted&&move.row!=null)TaskbarRows.save(items.getContext().getSharedPreferences("desktop",0),move.id,move.row);
         if(!closed)items.post(()->{if(!closed)finished.accept(order);});
